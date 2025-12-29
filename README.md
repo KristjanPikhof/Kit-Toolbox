@@ -26,8 +26,8 @@ Every function has built-in help: `kit my-function -h`
 #### Automated Installation (Recommended)
 
 ```bash
-# Clone or download kit-toolkit to ANY directory you prefer
-cd /path/to/kit-toolkit
+# Clone kit-toolkit to ANY directory you prefer
+git clone https://github.com/KristjanPikhof/Kit-Toolbox.git
 
 # Run the install script (it will auto-detect its location)
 zsh install.sh
@@ -126,14 +126,14 @@ Enhanced file listing with `lsd`:
 kit-toolkit/
 ├── loader.zsh                # Main loader with kit dispatcher
 ├── install.sh                # Automated installation script
-├── categories.conf            # Category registry
+├── categories.conf           # Category registry
 ├── shortcuts.conf            # User-specific navigation shortcuts (git-ignored)
 ├── shortcuts.conf.example    # Example shortcuts template
 ├── .gitignore                # Git ignore rules
-├── README.md                  # This file
-├── CONTRIBUTING.md            # Guide for adding new functions
+├── README.md                 # This file
+├── CONTRIBUTING.md           # Guide for adding new functions
 │
-├── functions/                 # Function modules
+├── functions/                # Function modules
 │   ├── images.sh             # Image processing functions
 │   ├── media.sh              # Media processing functions
 │   ├── system.sh             # System utilities
