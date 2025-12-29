@@ -1,0 +1,59 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Passwords
+.passwords
+.passwords.old
+.env
+
+# Thumbnails
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vim/
+
+# User-specific configuration
+shortcuts.conf
+
+# Backup files
+*.backup
+*.bak
+*.backup.*
+*.old
+
+# Zsh compiled files
+*.zwc
+*.zwc.old
+.zcompdump*
+
+# Temporary files
+*.tmp
+.tmp/
+tmp/
+
+# Log files
+*.log
+
+# AI assistant files
+.claude/plans/
+.claude/node_modules/
+.claude/settings.*
+.opencode/plans/
+.opencode/node_modules/
+.opencode/settings.*
+
+# Test files
+test/
+tests/
+*.test.sh
+
+# Kit files
+shortcuts.conf
