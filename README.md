@@ -1,0 +1,450 @@
+# Kit's Toolkit v2.0
+
+A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
+
+## Features
+
+✨ **Modular Design**
+Functions organized by category (images, media, system, navigation, etc.). Each category is a self-contained shell module.
+
+🎯 **Discoverability**
+Built-in help system with `kit -h` shows all functions grouped by category. Search functions with `kit --search <keyword>`.
+
+⚡ **Tab Completion**
+Full zsh tab completion for function names and arguments. Type `kit res<TAB>` and it suggests all matching functions.
+
+🤖 **AI-Friendly**
+Clear development patterns, template generator, and validator make it easy for AI agents (and humans) to add new functions consistently.
+
+📚 **Comprehensive Help**
+Every function has built-in help: `kit my-function -h`
+
+## Quick Start
+
+### Installation
+
+#### Automated Installation (Recommended)
+
+```bash
+# Clone or download kit-toolkit to ANY directory you prefer
+cd /path/to/kit-toolkit
+
+# Run the install script (it will auto-detect its location)
+zsh install.sh
+```
+
+**Note:** The installer automatically detects where you've downloaded kit-toolkit, so it works from any location.
+
+The installer will:
+- ✓ Backup your existing `.zshrc`
+- ✓ Add Kit configuration to your shell
+- ✓ Check for optional dependencies (ImageMagick, yt-dlp, ffmpeg, lsd)
+- ✓ Offer to install missing dependencies via Homebrew
+- ✓ Verify the installation
+
+#### Manual Installation
+
+If you prefer to install manually:
+
+```bash
+# Add to your ~/.zshrc (replace /path/to with your actual location)
+export KIT_EXT_DIR="/path/to/kit-toolkit"
+source "$KIT_EXT_DIR/loader.zsh"
+
+# Then reload your shell
+source ~/.zshrc
+```
+
+**Tip:** Use the automated installer - it automatically detects the correct path!
+
+### Usage
+
+```bash
+# List all functions
+kit -h
+
+# Get help for a specific function
+kit resize-img -h
+
+# Search for functions
+kit --search resize
+kit --list-categories
+
+# Run a function
+kit resize-img 800 myimage.jpg
+kit yt-download mp3 "https://youtube.com/watch?v=..."
+```
+
+## Available Functions
+
+### 📷 Image Processing
+Process images using ImageMagick:
+- **resize-img** — Resize image to specific width
+- **upscale-img** — Upscale image with quality filtering
+- **optimize-img** — Strip metadata and compress
+- **convert-bulk** — Batch convert image formats
+- **convert-heic** — Convert HEIC images to other formats
+- **optimize-to-webp** — Convert images to optimized WebP
+
+### 🎬 Media Processing
+Download and process video/audio:
+- **yt-download** — Download YouTube videos/audio (mp3 or mp4)
+- **removeaudio** — Remove audio track from video
+- **convert-to-mp3** — Extract audio and convert to MP3
+
+### 🖇️ System Utilities
+Shell and filesystem tools:
+- **mklink** — Create symbolic links with validation
+- **zed** — Open files in Zed editor
+
+### 🧭 Navigation Shortcuts
+Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
+- **ccflare-on** — Enable CCFlare proxy
+- **ccflare-off** — Disable CCFlare proxy
+
+**Auto-generated navigation shortcuts** (configured in `shortcuts.conf`):
+```bash
+kit dev        # Navigate to ~/Desktop/Development
+kit claude     # Navigate to ~/.claude/
+kit kit        # Navigate to kit-toolkit directory
+# ... and more, see `kit -h` for full list
+```
+
+**Deprecated:** `kit goto <name>` is deprecated. Use shortcuts directly: `kit <name>`
+
+### 📂 File Listing Enhancements
+Enhanced file listing with `lsd`:
+- **list-files** — List files (newest first)
+- **list-all** — List all files including hidden
+- **list-reverse** — List files (oldest first)
+- **list-all-reverse** — List all files (oldest first)
+- **list-tree** — Display tree structure
+
+## Directory Structure
+
+```
+kit-toolkit/
+├── loader.zsh                # Main loader with kit dispatcher
+├── install.sh                # Automated installation script
+├── categories.conf            # Category registry
+├── shortcuts.conf            # User-specific navigation shortcuts (git-ignored)
+├── shortcuts.conf.example    # Example shortcuts template
+├── .gitignore                # Git ignore rules
+├── README.md                  # This file
+├── CONTRIBUTING.md            # Guide for adding new functions
+│
+├── functions/                 # Function modules
+│   ├── images.sh             # Image processing functions
+│   ├── media.sh              # Media processing functions
+│   ├── system.sh             # System utilities
+│   ├── aliases.sh            # Navigation shortcuts
+│   └── lsd.sh                # File listing utilities
+│
+├── completions/              # Zsh completion scripts
+│   └── _kit                  # Tab completion for kit command
+│
+├── scripts/                  # Development and maintenance tools
+│   ├── new-function.sh       # Template generator for new functions
+│   ├── validate-pattern.sh   # Validator for pattern compliance
+│   ├── generate-completions.sh  # Auto-generate completion script
+│   └── validate-shortcuts.sh # Validate shortcuts configuration
+│
+└── llm_prompts/              # AI development guides
+    └── kit_pattern.md        # Complete pattern specification
+```
+
+## Commands and Flags
+
+### Help and Discovery
+
+```bash
+kit -h, --help           # Show all functions (grouped by category)
+kit <function> -h        # Show help for specific function
+kit --search <keyword>   # Search functions by name
+kit --list-categories    # List all categories with counts
+```
+
+### Examples
+
+```bash
+# Show all functions
+$ kit -h
+
+# Search for image functions
+$ kit --search image
+  convert-heic  (Image Processing)
+  optimize-to-webp  (Image Processing)
+
+# Show help for resize function
+$ kit resize-img -h
+Usage: kit resize-img <width> <file>
+Example: kit resize-img 800 photo.jpg
+
+# Use a function
+$ kit resize-img 800 photo.jpg
+Created: resized_photo.jpg
+```
+
+## Development & Extension
+
+### Adding a New Function
+
+1. **Generate template:**
+   ```bash
+   ./scripts/new-function.sh category function-name "Brief description"
+   ```
+
+2. **Implement the function** in `functions/category.sh`
+
+3. **Validate:**
+   ```bash
+   ./scripts/validate-pattern.sh functions/category.sh
+   ```
+
+4. **Test:**
+   ```bash
+   source loader.zsh
+   kit my-function -h
+   kit my-function <test-args>
+   ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for complete guide.
+
+### Creating a New Category
+
+1. Create `functions/newcategory.sh` with proper headers
+2. Add entry to `categories.conf`
+3. Generate functions using the template generator
+
+Example:
+```bash
+# Create new category for git tools
+touch functions/git.sh
+
+# Add to categories.conf
+# git:Git Tools:Git-related utilities
+
+# Generate first function
+./scripts/new-function.sh git git-clean-branches "Remove merged branches"
+```
+
+### Validating Functions
+
+Check if functions follow the pattern:
+```bash
+./scripts/validate-pattern.sh functions/myfile.sh
+./scripts/validate-pattern.sh functions/*.sh  # Check all
+```
+
+### Configuring Navigation Shortcuts
+
+The install script creates `shortcuts.conf` for you. This file is **user-specific** and **git-ignored**, so you can customize it without affecting the repository.
+
+Add directory shortcuts to `shortcuts.conf`:
+```bash
+# Format: name|path|description
+myproject|~/projects/myproject|My awesome project
+docs|~/Documents|Documents folder
+dev|~/Development|Main development directory
+```
+
+**Note:** The `shortcuts.conf` file is automatically created during installation. If you need to recreate it, copy from `shortcuts.conf.example`:
+```bash
+cp shortcuts.conf.example shortcuts.conf
+```
+
+Validate shortcuts for errors:
+```bash
+./scripts/validate-shortcuts.sh
+```
+
+Disable auto-generation of shortcuts:
+```bash
+export KIT_AUTO_SHORTCUTS=false
+```
+
+### Auto-generating Completions
+
+After adding new functions, regenerate tab completion:
+```bash
+./scripts/generate-completions.sh
+```
+
+## Pattern Requirements
+
+Every function must follow the pattern from `llm_prompts/kit_pattern.md`:
+
+✓ **Help block** — Show usage with `-h` flag
+✓ **Input validation** — Check required arguments (exit code 2)
+✓ **File checking** — Verify files exist (exit code 1)
+✓ **Dependency checking** — Verify required tools installed
+✓ **Error handling** — Send errors to stderr with proper exit codes
+✓ **Success message** — Confirm what was created/modified
+
+Example:
+```bash
+my-function() {
+    if [[ "$1" == "-h" || -z "$1" ]]; then
+        cat << EOF
+Usage: kit my-function <input>
+Description: Does something useful
+Example: kit my-function file.txt
+EOF
+        return 0
+    fi
+
+    [[ -f "$1" ]] || { echo "Error: File not found" >&2; return 1; }
+
+    # Implementation
+    echo "✅ Success message"
+}
+```
+
+## Exit Codes
+
+- **0** — Success
+- **1** — Error (file not found, operation failed)
+- **2** — Invalid usage (missing arguments, wrong format)
+
+## Troubleshooting
+
+### "Command not found" errors for basic commands (grep, wc, ls, etc.)
+
+This was a bug in versions prior to v2.0.1 where the `path` variable conflicted with zsh's special `path` array, corrupting your PATH. **This has been fixed.**
+
+If you're experiencing this:
+```bash
+# Update to the latest version
+cd $KIT_EXT_DIR  # wherever you installed it
+git pull  # or re-download
+
+# Reload your shell
+exec zsh
+```
+
+### Kit command not found
+```bash
+# Ensure loader is sourced
+source ~/.zshrc
+
+# Or manually load (if KIT_EXT_DIR is set)
+source $KIT_EXT_DIR/loader.zsh
+```
+
+### Tab completion not working
+```bash
+# Rebuild completion cache
+rm ~/.zcompdump*
+exec zsh  # Restart shell
+```
+
+### Function not showing in help
+```bash
+# Check category header has function listed
+grep "^# Functions:" $KIT_EXT_DIR/functions/category.sh
+
+# Reload functions
+source $KIT_EXT_DIR/loader.zsh
+```
+
+### Pre-existing aliases conflict
+If you see "defining function based on alias" errors, remove the old alias definitions from your `.zshrc` and use the function versions instead via the loader.
+
+## Uninstallation
+
+To uninstall Kit:
+
+```bash
+# 1. Remove Kit configuration from ~/.zshrc
+# Remove these lines:
+#   export KIT_EXT_DIR="..."
+#   source "$KIT_EXT_DIR/loader.zsh"
+
+# 2. Reload your shell
+source ~/.zshrc
+
+# 3. Optionally, delete the kit-toolkit directory
+rm -rf $KIT_EXT_DIR  # wherever you installed it
+```
+
+## Migration from Legacy Functions
+
+If you have existing shell functions and aliases:
+
+1. Create appropriate category file in `functions/`
+2. Migrate each function following the pattern
+3. Update your `.zshrc` to source the loader instead of old files
+4. Test each function works: `kit function-name -h`
+
+For directory navigation shortcuts, add them to `shortcuts.conf`:
+```bash
+# Before: .zshrc had
+alias myalias="cd /some/path"
+
+# After: shortcuts.conf has
+myalias|/some/path|My project directory
+
+# Then just use: kit myalias
+```
+
+## Dependencies
+
+Each category has different dependencies (installed via Homebrew):
+
+| Category | Dependencies |
+|----------|---|
+| images | `imagemagick` |
+| media | `yt-dlp`, `ffmpeg` |
+| system | none |
+| aliases | none |
+| lsd | `lsd` |
+
+Install with:
+```bash
+brew install imagemagick yt-dlp ffmpeg lsd
+```
+
+## Environment Variables
+
+- **KIT_EXT_DIR** — Path to kit-toolkit directory (auto-detected during installation, no default)
+- **KIT_AUTO_SHORTCUTS** — Enable/disable auto-generation of navigation shortcuts (default: `true`)
+
+**Note:** `KIT_EXT_DIR` is automatically set by the installer. The toolkit auto-detects its location, so it works from any directory.
+
+Example:
+```bash
+export KIT_EXT_DIR="/your/custom/location/kit-toolkit"
+export KIT_AUTO_SHORTCUTS=false
+```
+
+## Performance
+
+Functions are **pre-loaded** at shell startup for instant access. Loading takes ~50ms for all functions.
+
+For very large function sets, the dispatcher uses lazy-loading fallback to avoid overhead.
+
+## Documentation
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — Guide for adding new functions (for AI agents and humans)
+- **[llm_prompts/kit_pattern.md](llm_prompts/kit_pattern.md)** — Complete pattern specification
+- **[categories.conf](categories.conf)** — Category registry and descriptions
+
+## License
+
+Use freely. Modify as needed.
+
+## Version
+
+**v2.0.1** — Modular, extensible, AI-friendly
+
+### Changelog
+- **v2.0.1** (2025-12-29)
+  - 🐛 Fixed PATH corruption bug caused by `path` variable name conflict
+  - ✨ Added automated installation script (`install.sh`)
+  - 📝 Improved installation documentation
+- **v2.0.0**
+  - Initial modular release
+
+---
+
+For questions or to add functions, see [CONTRIBUTING.md](CONTRIBUTING.md)
