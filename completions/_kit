@@ -1,0 +1,97 @@
+#compdef kit
+# Completion script for kit command
+# Provides tab-completion for function names and arguments
+
+local -a commands
+local expl
+
+# Get all available functions from function files
+_kit_get_commands() {
+    local functions_dir="$KIT_EXT_DIR/functions"
+
+    for file in "$functions_dir"/*.sh; do
+        if [[ -f "$file" ]]; then
+            local functions=$(grep "^# Functions:" "$file" | cut -d: -f2- | xargs | tr ',' ' ')
+            for func in $functions; do
+                echo "$func"
+            done
+        fi
+    done | sort -u
+}
+
+# Build command list with descriptions
+_kit_build_command_list() {
+    local functions_dir="$KIT_EXT_DIR/functions"
+    local -a commands_with_desc=()
+
+    for file in "$functions_dir"/*.sh; do
+        if [[ -f "$file" ]]; then
+            local functions=$(grep "^# Functions:" "$file" | cut -d: -f2- | xargs | tr ',' ' ')
+            local category=$(grep "^# Category:" "$file" | cut -d: -f2- | xargs)
+
+            for func in $functions; do
+                # Try to get short description from function help
+                local desc=$(declare -f "$func" 2>/dev/null | grep -o 'Usage:.*$' | head -1 | sed 's/Usage: kit [^ ]* *//' | sed 's/ *Example.*//' | cut -c1-50)
+                if [[ -z "$desc" ]]; then
+                    desc="$category"
+                fi
+                commands_with_desc+=("$func:$desc")
+            done
+        fi
+    done
+
+    printf '%s\n' "$commands_with_desc[@]"
+}
+
+# Main completion logic
+case "$CURRENT" in
+    2)
+        # Complete the command name (first argument after 'kit')
+        local -a commands_list=()
+        while IFS=: read -r cmd desc; do
+            commands_list+=("$cmd:$desc")
+        done < <(_kit_build_command_list)
+
+        _describe 'kit commands' commands_list
+
+        # Also add special commands
+        local -a special_commands=(
+            '-h:Show help'
+            '--help:Show help'
+            '--search:Search functions by keyword'
+            '--list-categories:List all categories'
+        )
+        _describe 'special commands' special_commands
+        ;;
+    *)
+        # Complete arguments based on the command
+        local cmd="${words[2]}"
+        case "$cmd" in
+            # Commands that take file arguments
+            resize-img|upscale-img|optimize-img|convert-heic|zed)
+                _files
+                ;;
+            convert-bulk)
+                # First arg is extension, then output format
+                if [[ $CURRENT -eq 3 ]]; then
+                    _files -g '*.*' 'input file'
+                else
+                    _message 'output format'
+                fi
+                ;;
+            yt-download)
+                if [[ $CURRENT -eq 3 ]]; then
+                    _values 'mode' 'mp3' 'mp4'
+                elif [[ $CURRENT -eq 4 ]]; then
+                    _message 'URL'
+                fi
+                ;;
+            goto|mklink|list-files|list-all|list-reverse|list-all-reverse|list-tree|removeaudio|convert-to-mp3)
+                _files
+                ;;
+            *)
+                _files
+                ;;
+        esac
+        ;;
+esac
