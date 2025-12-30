@@ -89,8 +89,9 @@ Process images using ImageMagick:
 ### 🎬 Media Processing
 Download and process video/audio:
 - **yt-download** — Download YouTube videos/audio (mp3 or mp4)
-- **removeaudio** — Remove audio track from video
+- **remove-audio** — Remove audio track from video
 - **convert-to-mp3** — Extract audio and convert to MP3
+- **compress-video** — Compress video files for uploads
 
 ### 🖇️ System Utilities
 Shell and filesystem tools:
