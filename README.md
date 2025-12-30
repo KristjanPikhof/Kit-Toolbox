@@ -64,14 +64,14 @@ source ~/.zshrc
 kit -h
 
 # Get help for a specific function
-kit resize-img -h
+kit img-resize -h
 
 # Search for functions
 kit --search resize
 kit --list-categories
 
 # Run a function
-kit resize-img 800 myimage.jpg
+kit img-resize 800x600 myimage.jpg
 kit yt-download mp3 "https://youtube.com/watch?v=..."
 ```
 
@@ -79,19 +79,26 @@ kit yt-download mp3 "https://youtube.com/watch?v=..."
 
 ### 📷 Image Processing
 Process images using ImageMagick:
-- **resize-img** — Resize image to specific width
-- **upscale-img** — Upscale image with quality filtering
-- **optimize-img** — Strip metadata and compress
-- **convert-bulk** — Batch convert image formats
-- **convert-heic** — Convert HEIC images to other formats
-- **optimize-to-webp** — Convert images to optimized WebP
+- **img-resize** — Resize image preserving aspect ratio
+- **img-resize-width** — Resize image to specific width (auto height)
+- **img-resize-percentage** — Resize image by percentage (for upscaling/downscaling)
+- **img-optimize** — Strip metadata and compress
+- **img-convert** — Batch convert image formats
+- **img-optimize-to-webp** — Convert images to optimized WebP
+- **img-thumbnail** — Fast thumbnail generation
+- **img-resize-exact** — Force exact dimensions (may distort)
+- **img-resize-fill** — Resize to fill area, crop excess
+- **img-adaptive-resize** — Quality resize with mesh interpolation
+- **img-batch-resize** — Batch resize multiple images
+- **img-resize-shrink-only** — Only shrink images, never enlarge
+- **img-resize-colorspace** — Resize with colorspace correction
 
 ### 🎬 Media Processing
 Download and process video/audio:
 - **yt-download** — Download YouTube videos/audio (mp3 or mp4)
 - **remove-audio** — Remove audio track from video
 - **convert-to-mp3** — Extract audio and convert to MP3
-- **compress-video** — Compress video files for uploads
+- **compress-video** — Compress video files for uploads (supports CRF, preset, width, bitrate options)
 
 ### 🖇️ System Utilities
 Shell and filesystem tools:
@@ -172,19 +179,70 @@ kit --list-categories    # List all categories with counts
 $ kit -h
 
 # Search for image functions
-$ kit --search image
-  convert-heic  (Image Processing)
-  optimize-to-webp  (Image Processing)
+$ kit --search resize
+  img-resize  (Image Processing)
+  img-resize-width  (Image Processing)
+  img-resize-percentage  (Image Processing)
 
 # Show help for resize function
-$ kit resize-img -h
-Usage: kit resize-img <width> <file>
-Example: kit resize-img 800 photo.jpg
+$ kit img-resize -h
+Usage: kit img-resize <width>x<height> <file>
+Example: kit img-resize 800x600 photo.jpg
 
 # Use a function
-$ kit resize-img 800 photo.jpg
-Created: resized_photo.jpg
+$ kit img-resize 800x600 photo.jpg
+Created: photo-resized.jpg
+
+# Compress video (more complex with options)
+$ kit compress-video video.mp4
+$ kit compress-video video.mp4 -c 28 -o small.mp4
+$ kit compress-video video.mp4 --width 1920 --preset medium
 ```
+
+#### Video Compression Examples
+
+The `compress-video` function supports multiple options for controlling output quality and file size:
+
+```bash
+# Basic compression (default settings)
+kit compress-video video.mp4
+
+# High compression for uploads (higher CRF = smaller file, lower quality)
+kit compress-video video.mp4 -c 28 -o small.mp4
+
+# Best quality preservation (lower CRF = better quality, larger file)
+kit compress-video video.mp4 -c 18 -o high-quality.mp4
+
+# Custom dimensions
+kit compress-video video.mp4 --width 1920
+kit compress-video video.mp4 --width 1280 --preset medium
+
+# Fast compression (trade quality for speed)
+kit compress-video video.mp4 -p ultrafast -c 26
+
+# Very slow compression (better quality at same bitrate)
+kit compress-video video.mp4 -p veryslow -c 22
+```
+
+**Options:**
+- `-o, --output FILE` — Output filename (default: input_compressed.mp4)
+- `-c, --crf NUM` — Quality level 18-28 (default: 23, lower = better)
+- `-p, --preset PRESET` — Encoding speed (default: slow)
+  - Options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
+- `-w, --width NUM` — Scale width in pixels (default: 1280, -1 = no scaling)
+- `-b, --bitrate NUM` — Audio bitrate in k (default: 128)
+- `-v, --verbose` — Show ffmpeg output
+
+**CRF Quality Reference:**
+
+| CRF Value | Quality | File Size | Use Case |
+|-----------|---------|-----------|----------|
+| 0-17 | Excellent (near lossless) | Very large | Archival, editing |
+| 18-23 | High | Large | Default sweet spot |
+| 24-28 | Medium | Medium | Web uploads, sharing |
+| 29+ | Low | Small | Quick sharing, storage |
+
+**Note:** Lower CRF = better quality but larger file. The default of 23 is a good balance for most use cases.
 
 ## Development & Extension
 
