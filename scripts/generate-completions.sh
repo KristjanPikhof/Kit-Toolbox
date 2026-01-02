@@ -136,7 +136,7 @@ for file in "$FUNCTIONS_DIR"/*.sh; do
             func=$(echo "$func" | xargs)  # Trim whitespace
             if [[ -n "$func" ]]; then
                 # Get description
-                local desc=$(get_function_description "$func" "$file")
+                desc=$(get_function_description "$func" "$file")
 
                 # Determine what kind of arguments this function takes
                 case "$func" in
