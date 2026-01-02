@@ -19,6 +19,18 @@ _kit_get_commands() {
     done | sort -u
 }
 
+# Get editor shortcuts from editor.conf
+_kit_get_editors() {
+    local editors_file="$KIT_EXT_DIR/editor.conf"
+    [[ -f "$editors_file" ]] || return 0
+
+    while IFS='|' read -r name cmd desc; do
+        [[ "$name" =~ ^# ]] && continue
+        [[ -z "$name" ]] && continue
+        echo "$name"
+    done < "$editors_file"
+}
+
 # Build command list with descriptions
 _kit_build_command_list() {
     local functions_dir="$KIT_EXT_DIR/functions"
@@ -39,6 +51,16 @@ _kit_build_command_list() {
             done
         fi
     done
+
+    # Add editor shortcuts
+    local editors_file="$KIT_EXT_DIR/editor.conf"
+    if [[ -f "$editors_file" ]]; then
+        while IFS='|' read -r name cmd desc; do
+            [[ "$name" =~ ^# ]] && continue
+            [[ -z "$name" ]] && continue
+            commands_with_desc+=("$name:$desc")
+        done < "$editors_file"
+    fi
 
     printf '%s\n' "$commands_with_desc[@]"
 }
@@ -66,7 +88,24 @@ case "$CURRENT" in
     *)
         # Complete arguments based on the command
         local cmd="${words[2]}"
-        case "$cmd" in
+        # Check if cmd is an editor shortcut
+        local is_editor=0
+        local editors_file="$KIT_EXT_DIR/editor.conf"
+        if [[ -f "$editors_file" ]]; then
+            while IFS='|' read -r name editor_cmd desc; do
+                [[ "$name" =~ ^# ]] && continue
+                [[ -z "$name" ]] && continue
+                if [[ "$name" == "$cmd" ]]; then
+                    is_editor=1
+                    break
+                fi
+            done < "$editors_file"
+        fi
+
+        if [[ $is_editor -eq 1 ]]; then
+            _files
+        else
+            case "$cmd" in
             ccflare-on)
                 _files
                 ;;
@@ -173,5 +212,6 @@ case "$CURRENT" in
                 _files
                 ;;
         esac
+        fi
         ;;
 esac

@@ -108,7 +108,8 @@ _kit_generate_editors() {
         fi
 
         if declare -f "$name" > /dev/null 2>&1; then
-            echo "⚠️  Warning: Editor shortcut '$name' conflicts with existing function - prefer editor behavior" >&2
+            echo "⚠️  Warning: Editor shortcut '$name' conflicts with existing function - skipping" >&2
+            continue
         fi
 
         # Escape single quotes in command

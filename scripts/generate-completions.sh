@@ -98,6 +98,16 @@ _kit_build_command_list() {
         fi
     done
 
+    # Add editor shortcuts from editor.conf
+    local editors_file="$KIT_EXT_DIR/editor.conf"
+    if [[ -f "$editors_file" ]]; then
+        while IFS='|' read -r name cmd desc; do
+            [[ "$name" =~ ^# ]] && continue
+            [[ -z "$name" ]] && continue
+            commands_with_desc+=("$name:$desc")
+        done < "$editors_file"
+    fi
+
     printf '%s\n' "$commands_with_desc[@]"
 }
 
@@ -127,7 +137,24 @@ COMPLETION_HEADER
 echo "    *)" >> "$OUTPUT_FILE"
 echo "        # Complete arguments based on the command" >> "$OUTPUT_FILE"
 echo "        local cmd=\"\${words[2]}\"" >> "$OUTPUT_FILE"
-echo "        case \"\$cmd\" in" >> "$OUTPUT_FILE"
+echo "        # Check if cmd is an editor shortcut" >> "$OUTPUT_FILE"
+echo "        local is_editor=0" >> "$OUTPUT_FILE"
+echo "        local editors_file=\"\$KIT_EXT_DIR/editor.conf\"" >> "$OUTPUT_FILE"
+echo "        if [[ -f \"\$editors_file\" ]]; then" >> "$OUTPUT_FILE"
+echo "            while IFS='|' read -r name editor_cmd desc; do" >> "$OUTPUT_FILE"
+echo "                [[ \"\$name\" =~ ^# ]] && continue" >> "$OUTPUT_FILE"
+echo "                [[ -z \"\$name\" ]] && continue" >> "$OUTPUT_FILE"
+echo "                if [[ \"\$name\" == \"\$cmd\" ]]; then" >> "$OUTPUT_FILE"
+echo "                    is_editor=1" >> "$OUTPUT_FILE"
+echo "                    break" >> "$OUTPUT_FILE"
+echo "                fi" >> "$OUTPUT_FILE"
+echo "            done < \"\$editors_file\"" >> "$OUTPUT_FILE"
+echo "        fi" >> "$OUTPUT_FILE"
+echo "" >> "$OUTPUT_FILE"
+echo "        if [[ \$is_editor -eq 1 ]]; then" >> "$OUTPUT_FILE"
+echo "            _files" >> "$OUTPUT_FILE"
+echo "        else" >> "$OUTPUT_FILE"
+echo "            case \"\$cmd\" in" >> "$OUTPUT_FILE"
 
 # Extract all functions and add them to the case statement
 for file in "$FUNCTIONS_DIR"/*.sh; do
@@ -171,6 +198,7 @@ cat >> "$OUTPUT_FILE" << 'COMPLETION_FOOTER'
                 _files
                 ;;
         esac
+        fi
         ;;
 esac
 COMPLETION_FOOTER
