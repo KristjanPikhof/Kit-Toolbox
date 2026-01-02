@@ -10,21 +10,46 @@
 #       source $KIT_EXT_DIR/loader.zsh
 #
 # ============================================================================
-# PLATFORM DIFFERENCES
+# HOW TO ADD YOUR EDITOR
 # ============================================================================
 #
 # macOS GUI Apps:
-#   Use: open -a "AppName"
-#   Example: zed|open -a Zed|Zed editor
+#   Use the full path to the .app bundle, or 'open -a AppName'
+#
+#   Example using 'open -a':
+#     myeditor|open -a "MyEditor"|MyEditor App
+#
+#   Example using full path:
+#     myeditor|"/Applications/MyEditor.app/Contents/MacOS/MyEditor"|MyEditor
 #
 # Linux GUI Apps:
-#   Use: the command directly (must be in PATH)
-#   Example: code|code|VS Code
+#   Use the command name (must be in PATH) or full path to binary
+#
+#   Example using command name:
+#     myeditor|myeditor|MyEditor
+#
+#   Example using full path:
+#     myeditor|/usr/bin/myeditor|MyEditor
 #
 # ============================================================================
+# EXAMPLES - CUSTOMIZE THESE FOR YOUR EDITORS
+# ============================================================================
 
-# Popular editors
+# VS Code (cross-platform)
+# macOS: code command must be installed from Command Palette
+# Linux: code command must be in PATH
 code|code|VS Code
-zed|open -a Zed|Zed editor (macOS)
+
+# Zed editor (macOS - use open -a for .app bundles)
+zed|open -a "/Applications/Zed.app"|Zed editor
+
+# Cursor AI editor
 cursor|cursor|Cursor AI editor
+
+# Sublime Text
 subl|subl|Sublime Text
+
+# Add your own editors below using the format: name|command|description
+# Example:
+#   emacs|open -a Emacs|Emacs (macOS)
+#   idea|/usr/bin/idea|IntelliJ IDEA (Linux)
