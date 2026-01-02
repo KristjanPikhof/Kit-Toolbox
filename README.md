@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.0
+# Kit's Toolkit v2.4
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -26,10 +26,6 @@ This toolkit is designed to work on both macOS and Linux, but **requires the Zsh
 |----|--------|
 | **macOS** | ✅ Fully supported |
 | **Linux** | ✅ Fully supported (Debian/Ubuntu, Fedora, Arch, openSUSE) |
-
-The `zed` function supports:
-- **macOS**: Uses Zed.app from `/Applications/Zed.app`
-- **Linux**: Uses the `zed` command from PATH
 
 Image functions require **ImageMagick v7+** (with the `magick` command).
 
@@ -160,7 +156,6 @@ Download and process video/audio:
 ### 🖇️ System Utilities
 Shell and filesystem tools:
 - **mklink** — Create symbolic links with validation
-- **zed** — Open files in Zed editor (cross-platform)
 - **killports** — Kill processes using specified network ports
 - **uninstall** — Remove Kit's Toolkit configuration from your shell
 - **update** — Update Kit's Toolkit to the latest version
@@ -185,6 +180,38 @@ kit kit        # Navigate to kit-toolkit directory
 
 **Deprecated:** `kit goto <name>` is deprecated. Use shortcuts directly: `kit <name>`
 
+### ✏️ Editor Shortcuts
+Auto-generated shortcuts from `editor.conf` for opening files/folders in your preferred editor:
+
+```bash
+kit code myfile.md    # Open file in VS Code
+kit zed .             # Open current folder in Zed
+kit cursor src/       # Open folder in Cursor editor
+```
+
+**Auto-generated editor shortcuts** (configured in `editor.conf`):
+
+The editor shortcuts are automatically generated from your `editor.conf` file. This file is **user-specific** and **git-ignored**, so you can customize it with your preferred editors.
+
+**Example `editor.conf` entries:**
+```bash
+# Format: name|command|description
+code|code|VS Code
+zed|open -a Zed|Zed editor (macOS)
+cursor|cursor|Cursor AI editor
+nvim|nvim|Neovim
+```
+
+Create your `editor.conf` from the example:
+```bash
+cp editor.conf.example editor.conf
+```
+
+Disable auto-generation of editor shortcuts:
+```bash
+export KIT_AUTO_EDITORS=false
+```
+
 ### 📂 File Listing Enhancements
 Enhanced file listing with `lsd`:
 - **list-files** — List files (newest first)
@@ -202,6 +229,8 @@ kit-toolkit/
 ├── categories.conf           # Category registry
 ├── shortcuts.conf            # User-specific navigation shortcuts (git-ignored)
 ├── shortcuts.conf.example    # Example shortcuts template
+├── editor.conf               # User-specific editor shortcuts (git-ignored)
+├── editor.conf.example       # Example editor shortcuts template
 ├── .gitignore                # Git ignore rules
 ├── README.md                 # This file
 ├── CONTRIBUTING.md           # Guide for adding new functions
@@ -664,6 +693,7 @@ sudo pacman -S yt-dlp ffmpeg lsd
 
 - **KIT_EXT_DIR** — Path to kit-toolkit directory (auto-detected during installation, no default)
 - **KIT_AUTO_SHORTCUTS** — Enable/disable auto-generation of navigation shortcuts (default: `true`)
+- **KIT_AUTO_EDITORS** — Enable/disable auto-generation of editor shortcuts (default: `true`)
 
 **Note:** `KIT_EXT_DIR` is automatically set by the installer. The toolkit auto-detects its location, so it works from any directory.
 
@@ -671,6 +701,7 @@ Example:
 ```bash
 export KIT_EXT_DIR="/your/custom/location/kit-toolkit"
 export KIT_AUTO_SHORTCUTS=false
+export KIT_AUTO_EDITORS=false
 ```
 
 ## Performance
@@ -691,9 +722,17 @@ Use freely. Modify as needed.
 
 ## Version
 
-**v2.3.0** — Uninstall, update, & VERSION file
+**v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.4.0** (2026-01-02)
+  - ✏️ Added configurable editor shortcuts via `editor.conf`
+  - ✏️ Auto-generates editor functions (code, zed, cursor, nvim, etc.)
+  - ✏️ Replaces hardcoded `zed` function with flexible config system
+  - 📝 Updated README with editor shortcuts documentation
+  - 🔧 Added `KIT_AUTO_EDITORS` environment variable
+  - 📁 Added `editor.conf.example` with common editor configurations
+  - 🔧 Updated `editor.conf` to `.gitignore`
 - **v2.3.0** (2026-01-02)
   - 🗑️ Added `uninstall` command - safely remove Kit configuration from your shell
   - 🗑️ Added `--purge` option to also delete the kit-toolkit directory
@@ -715,7 +754,6 @@ Use freely. Modify as needed.
 - **v2.1.0** (2026-01-02)
   - 🌍 Added Linux/macOS cross-platform support
   - 🖼️ Image functions now require ImageMagick v7+ (`magick` command)
-  - 🔧 Fixed `zed()` function to work on both macOS (Zed.app) and Linux (`zed` command)
   - 🔧 Fixed `realpath` compatibility for macOS (uses Perl/zsh fallback)
   - 📝 Updated tab completion with correct function names
   - 📚 Updated documentation with Linux installation instructions

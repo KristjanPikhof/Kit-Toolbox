@@ -22,6 +22,7 @@ Thumbs.db
 
 # User-specific configuration
 shortcuts.conf
+editor.conf
 
 # Backup files
 *.backup
