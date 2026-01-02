@@ -6,9 +6,6 @@
 # 2. Full command to open the editor
 # 3. Description
 #
-# Note: After adding editors to your editor.conf, reload with:
-#       source $KIT_EXT_DIR/loader.zsh
-#
 # ============================================================================
 # HOW TO ADD YOUR EDITOR
 # ============================================================================
@@ -35,21 +32,13 @@
 # EXAMPLES - CUSTOMIZE THESE FOR YOUR EDITORS
 # ============================================================================
 
-# VS Code (cross-platform)
 # macOS: code command must be installed from Command Palette
 # Linux: code command must be in PATH
-code|code|VS Code
-
-# Zed editor (macOS - use open -a for .app bundles)
-zed|open -a "/Applications/Zed.app"|Zed editor
-
-# Cursor AI editor
-cursor|cursor|Cursor AI editor
-
-# Sublime Text
-subl|subl|Sublime Text
 
 # Add your own editors below using the format: name|command|description
 # Example:
 #   emacs|open -a Emacs|Emacs (macOS)
 #   idea|/usr/bin/idea|IntelliJ IDEA (Linux)
+
+# Zed editor (macOS - use open -a for .app bundles)
+zed|open -a "/Applications/Zed.app"|Zed editor
