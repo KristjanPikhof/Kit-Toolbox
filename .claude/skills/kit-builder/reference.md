@@ -22,8 +22,9 @@ source loader.zsh
 kit <function-name> -h
 kit <function-name> <test-input>
 
-# 5. Update completions (if needed)
+# 5. Verify completions (optional - system is fully dynamic)
 ./scripts/generate-completions.sh
+# Note: Completions auto-discover functions. Just reload your shell after adding new functions.
 ```
 
 ---
@@ -448,12 +449,13 @@ Check that function name in:
 
 **Solution:**
 ```bash
-# Regenerate completions
-cd $KIT_EXT_DIR
-./scripts/generate-completions.sh
-
-# Reload shell
+# The completion system is fully dynamic - just reload your shell
 exec zsh
+# or
+source ~/.zshrc
+
+# Verify the completion system is working
+./scripts/generate-completions.sh
 ```
 
 ---
@@ -597,7 +599,10 @@ source $KIT_EXT_DIR/loader.zsh
 kit my-func -h
 kit my-func test-input
 
-# Update completions
+# Completions auto-update - just reload shell
+source ~/.zshrc
+
+# Verify completion system (optional)
 ./scripts/generate-completions.sh
 
 # List all functions

@@ -130,9 +130,10 @@ Validates functions against kit_pattern.md:
 - Error codes correct
 
 ### generate-completions.sh
-Updates tab completion:
-- Adds new function to completions
-- Enables shell tab completion
+Verifies the dynamic completion system:
+- The completion system is fully dynamic (auto-discovers functions)
+- No manual regeneration needed
+- Use this script to verify the system is working correctly
 
 ### validate-shortcuts.sh
 Validates shortcuts configuration:
