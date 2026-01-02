@@ -132,6 +132,7 @@ kit yt-download mp3 "https://youtube.com/watch?v=..."
 
 ### 📷 Image Processing
 Process images using ImageMagick:
+- **img-rename** — Sanitize image filenames or rename sequentially (image_1.jpg, image_2.jpg)
 - **img-resize** — Resize image preserving aspect ratio
 - **img-resize-width** — Resize image to specific width (auto height)
 - **img-resize-percentage** — Resize image by percentage (for upscaling/downscaling)
@@ -291,6 +292,21 @@ Example: kit img-resize 800x600 photo.jpg
 # Use a function
 $ kit img-resize 800x600 photo.jpg
 Created: photo-resized.jpg
+
+# Rename image files (sanitize spaces and special characters)
+$ kit img-rename "my photo 1.jpg"
+Renamed: my photo 1.jpg -> my_photo_1.jpg
+$ kit img-rename "VR (Quest/similar).jpg"
+Renamed: VR (Quest/similar).jpg -> VR_Quest_similar.jpg
+$ kit img-rename . --sep "-"
+Renamed: image 1.png -> image-1.png
+
+# Rename image files sequentially (image_1.jpg, image_2.png, ...)
+$ kit img-rename . --name "photo"
+Renamed: IMG_001.jpg -> photo_1.jpg
+Renamed: DSC_123.png -> photo_2.png
+$ kit img-rename . --name "img" --start 10
+Renamed: photo.jpg -> img_10.jpg
 
 # Compress video (more complex with options)
 $ kit compress-video video.mp4
