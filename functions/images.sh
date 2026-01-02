@@ -530,6 +530,7 @@ EOF
     fi
 
     # Sanitize filename to prevent injection attacks
+    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
     if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
        [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
        [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
@@ -867,6 +868,7 @@ EOF
     fi
 
     # Sanitize filename to prevent injection attacks
+    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
     if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
        [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
        [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then

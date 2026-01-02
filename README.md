@@ -314,7 +314,6 @@ Renamed: photo.jpg -> img_10.jpg
 # Recursive sanitization with dry-run
 $ kit img-rename . --recursive --sep "-" --dry-run
 Would rename: subfolder/my image.png -> subfolder/my-image.png
-
 # Compress video (more complex with options)
 $ kit compress-video video.mp4
 $ kit compress-video video.mp4 -c 28 -o small.mp4
