@@ -19,6 +19,12 @@ if [[ ! -d "$KIT_EXT_DIR" ]]; then
     return 1
 fi
 
+# Read version from VERSION file
+KIT_VERSION="${KIT_VERSION:-unknown}"
+if [[ -f "$KIT_EXT_DIR/VERSION" ]]; then
+    KIT_VERSION="$(cat "$KIT_EXT_DIR/VERSION" | tr -d '[:space:]')"
+fi
+
 # ============================================================================
 # LOAD ALL FUNCTIONS
 # ============================================================================
@@ -149,7 +155,7 @@ kit() {
 
         echo ""
         echo "${BOLD}╭─────────────────────────────────────────────────────────────────╮${NC}"
-        echo "${BOLD}│${NC}  ${BLUE}🛠️  Kit - Shell Toolkit${NC}                          ${DIM}v2.3.0${NC}  ${BOLD}│${NC}"
+        echo "${BOLD}│${NC}  ${BLUE}🛠️  Kit - Shell Toolkit${NC}                      ${DIM}v${KIT_VERSION}${NC}  ${BOLD}│${NC}"
         echo "${BOLD}╰─────────────────────────────────────────────────────────────────╯${NC}"
         echo ""
 
