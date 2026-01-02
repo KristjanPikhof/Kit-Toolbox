@@ -54,8 +54,17 @@ _kit_validate_path() {
     local expanded_path="${path/\\~/$HOME}"
 
     # Check for path traversal attempts
-    if [[ "$path" == *"../"* ]] || [[ "$path" == *"/.."* ]] || [[ "$path" == "~"* ]]; then
+    if [[ "$path" == *"../"* ]] || [[ "$path" == *"/.."* ]]; then
         return 1
+    fi
+
+    # Allow ~/ prefix for home directory, but reject bare ~ or ~user patterns
+    if [[ "$path" == "~" ]] || [[ "$path" == "~/"* ]] || [[ "$path" == "~"* ]]; then
+        # Only allow ~/... (home directory with subpath)
+        if [[ "$path" != "~/"* ]]; then
+            # Reject bare ~ or ~user
+            return 1
+        fi
     fi
 
     # Expand and check if path exists (or could exist)
