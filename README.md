@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.4.1
+# Kit's Toolkit v2.4.3
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -132,13 +132,13 @@ kit yt-download mp3 "https://youtube.com/watch?v=..."
 
 ### 📷 Image Processing
 Process images using ImageMagick:
-- **img-rename** — Sanitize image filenames or rename sequentially (image_1.jpg, image_2.jpg)
+- **img-rename** — Sanitize image filenames or rename sequentially. Features: custom separators (`_` or `-`), sequential naming with `--name`, recursive processing (`-r`), and dry-run mode (`-n`).
 - **img-resize** — Resize image preserving aspect ratio
 - **img-resize-width** — Resize image to specific width (auto height)
 - **img-resize-percentage** — Resize image by percentage (for upscaling/downscaling)
 - **img-optimize** — Strip metadata and compress
 - **img-convert** — Batch convert image formats
-- **img-optimize-to-webp** — Convert images to optimized WebP
+- **img-optimize-to-webp** — Convert images to optimized WebP (supports directory target)
 - **img-thumbnail** — Fast thumbnail generation
 - **img-resize-exact** — Force exact dimensions (may distort)
 - **img-resize-fill** — Resize to fill area, crop excess
@@ -286,8 +286,11 @@ $ kit --search resize
 
 # Show help for resize function
 $ kit img-resize -h
-Usage: kit img-resize <width>x<height> <file>
-Example: kit img-resize 800x600 photo.jpg
+Usage: kit img-resize <width>x<height> <file|directory> [options]
+Example: 
+  kit img-resize 800x600 photo.jpg
+  kit img-resize 1024 . --recursive
+  kit img-resize 1920x1080 . --dry-run
 
 # Use a function
 $ kit img-resize 800x600 photo.jpg
@@ -308,6 +311,9 @@ Renamed: DSC_123.png -> photo_2.png
 $ kit img-rename . --name "img" --start 10
 Renamed: photo.jpg -> img_10.jpg
 
+# Recursive sanitization with dry-run
+$ kit img-rename . --recursive --sep "-" --dry-run
+Would rename: subfolder/my image.png -> subfolder/my-image.png
 # Compress video (more complex with options)
 $ kit compress-video video.mp4
 $ kit compress-video video.mp4 -c 28 -o small.mp4
@@ -764,10 +770,17 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.4.3** — Enhanced image utilities and batch processing
 **v2.4.1** — Dynamic tab completion system
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.4.3** (2026-01-02)
+  - 📷 Enhanced `img-rename` with sanitization and sequential modes
+  - 🖼️ Added directory target and recursive support (`-r`) to all major image utilities
+  - 🔍 Added dry-run mode (`-n`) to image processing functions
+  - 🔧 Improved Zsh compatibility and filename sanitization robustness
+  - 🐛 Fixed `bad substitution` errors in Zsh and empty filename bugs
 - **v2.4.1** (2026-01-02)
   - ⚡ Fully dynamic auto-discovering tab completion system
   - 🔧 No manual regeneration needed - completions discover functions, editors, and shortcuts automatically
