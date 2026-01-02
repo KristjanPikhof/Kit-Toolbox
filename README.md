@@ -2,6 +2,16 @@
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
+## Platform Support
+
+**macOS & Linux**
+
+This toolkit is designed to work on both macOS and Linux. The `zed` function supports:
+- **macOS**: Uses Zed.app from `/Applications/Zed.app`
+- **Linux**: Uses the `zed` command from PATH
+
+Image functions require **ImageMagick v7+** (with the `magick` command).
+
 ## Features
 
 ✨ **Modular Design**
@@ -448,19 +458,63 @@ myalias|/some/path|My project directory
 
 ## Dependencies
 
-Each category has different dependencies (installed via Homebrew):
+Each category has different dependencies:
 
 | Category | Dependencies |
 |----------|---|
-| images | `imagemagick` |
+| images | **ImageMagick v7+** (with `magick` command) |
 | media | `yt-dlp`, `ffmpeg` |
 | system | none |
 | aliases | none |
 | lsd | `lsd` |
 
-Install with:
+### Installing ImageMagick v7
+
+**macOS:**
 ```bash
-brew install imagemagick yt-dlp ffmpeg lsd
+brew install imagemagick
+```
+
+**Linux:**
+```bash
+# Fedora (has v7 by default)
+sudo dnf install imagemagick
+
+# Arch Linux (has v7 by default)
+sudo pacman -S imagemagick
+
+# Debian/Ubuntu
+# Ubuntu's default repo has v6, so you may need:
+sudo add-apt-repository ppa:imagemagick/ppa
+sudo apt update
+sudo apt install imagemagick
+
+# Or compile from source: https://imagemagick.org/script/download.php
+```
+
+**Verify v7 installation:**
+```bash
+# Should show 'magick' command available
+magick --version
+```
+
+### Installing Other Dependencies
+
+**macOS:**
+```bash
+brew install yt-dlp ffmpeg lsd
+```
+
+**Linux:**
+```bash
+# Debian/Ubuntu
+sudo apt install yt-dlp ffmpeg lsd
+
+# Fedora
+sudo dnf install yt-dlp ffmpeg lsd
+
+# Arch Linux
+sudo pacman -S yt-dlp ffmpeg lsd
 ```
 
 ## Environment Variables
@@ -494,9 +548,16 @@ Use freely. Modify as needed.
 
 ## Version
 
-**v2.0.1** — Modular, extensible, AI-friendly
+**v2.1.0** — Cross-platform compatibility, ImageMagick v7
 
 ### Changelog
+- **v2.1.0** (2026-01-02)
+  - 🌍 Added Linux/macOS cross-platform support
+  - 🖼️ Image functions now require ImageMagick v7+ (`magick` command)
+  - 🔧 Fixed `zed()` function to work on both macOS (Zed.app) and Linux (`zed` command)
+  - 🔧 Fixed `realpath` compatibility for macOS (uses Perl/zsh fallback)
+  - 📝 Updated tab completion with correct function names
+  - 📚 Updated documentation with Linux installation instructions
 - **v2.0.1** (2025-12-29)
   - 🐛 Fixed PATH corruption bug caused by `path` variable name conflict
   - ✨ Added automated installation script (`install.sh`)

@@ -34,6 +34,7 @@ Ask focused questions to understand what needs to be built:
 - Should it modify files in-place or create new ones?
 - What are the success/failure conditions?
 - Any special error handling needed?
+- **Cross-platform considerations?** (macOS vs Linux differences)
 
 ### Phase 2: Determine Category
 
@@ -136,7 +137,17 @@ EOF
 
     # Dependency checking (if applicable)
     if ! command -v required_tool &> /dev/null; then
-        echo "Error: required_tool not installed. Install with: brew install package" >&2
+        echo "Error: required_tool not installed." >&2
+        case "$(uname -s)" in
+            Darwin)
+                echo "Install with: brew install package" >&2
+                ;;
+            Linux)
+                echo "Install with: sudo apt install package  # Debian/Ubuntu" >&2
+                echo "            sudo dnf install package  # Fedora" >&2
+                echo "            sudo pacman -S package     # Arch" >&2
+                ;;
+        esac
         return 1
     fi
 
@@ -379,6 +390,56 @@ EOF
     echo "✅ Processed with quality=$quality"
 }
 ```
+
+### Cross-Platform Compatibility
+
+When writing functions that work on both macOS and Linux:
+
+```bash
+# OS Detection helper
+_kit_detect_os() {
+    case "$(uname -s)" in
+        Darwin)  echo "macos" ;;
+        Linux)   echo "linux" ;;
+        *)       echo "unknown" ;;
+    esac
+}
+
+# Platform-specific commands
+cross-platform-function() {
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        cat << EOF
+Usage: kit cross-platform-function <input>
+Description: Works on both macOS and Linux
+Platform support:
+  - macOS: Uses native tools
+  - Linux: Uses equivalent tools
+EOF
+        return 0
+    fi
+
+    local input="$1"
+    local os="$(_kit_detect_os)"
+
+    # Platform-specific logic
+    case "$os" in
+        macos)
+            # macOS-specific implementation
+            ;;
+        linux)
+            # Linux-specific implementation
+            ;;
+    esac
+
+    echo "✅ Processed on $os"
+}
+```
+
+**Common cross-platform considerations:**
+- **File paths**: Use `$HOME` instead of `~` in scripts
+- **Commands**: `realpath` may not exist on macOS (use Perl or zsh fallback)
+- **Install instructions**: Provide platform-specific install commands
+- **Editor integration**: macOS uses `open -a AppName`, Linux uses direct command
 
 ## Category Management
 

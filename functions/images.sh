@@ -1,8 +1,32 @@
-# images.sh - Image manipulation utilities using ImageMagick
+# images.sh - Image manipulation utilities using ImageMagick v7
 # Category: Image Processing
-# Description: ImageMagick-based image manipulation and optimization utilities
-# Dependencies: imagemagick
+# Description: ImageMagick v7-based image manipulation and optimization utilities
+# Dependencies: imagemagick (v7+ with 'magick' command)
 # Functions: img-resize-width, img-resize-percentage, img-optimize, img-convert, img-optimize-to-webp, img-resize, img-thumbnail, img-resize-exact, img-resize-fill, img-adaptive-resize, img-batch-resize, img-resize-shrink-only, img-resize-colorspace
+
+# Helper function to check ImageMagick v7 availability
+_kit_require_imagemagick() {
+    if ! command -v magick &> /dev/null; then
+        echo "Error: ImageMagick v7 not found (requires 'magick' command)." >&2
+        echo "" >&2
+        echo "Install with:" >&2
+        case "$(uname -s)" in
+            Darwin)
+                echo "  brew install imagemagick" >&2
+                ;;
+            Linux)
+                echo "  sudo apt install imagemagick      # Debian/Ubuntu (may need PPA for v7)" >&2
+                echo "  sudo dnf install imagemagick      # Fedora" >&2
+                echo "  sudo pacman -S imagemagick        # Arch" >&2
+                ;;
+            *)
+                echo "  See: https://imagemagick.org/script/download.php" >&2
+                ;;
+        esac
+        return 1
+    fi
+    return 0
+}
 
 # Image Resize by Width (height auto-calculated to preserve aspect ratio)
 img-resize-width() {
@@ -34,8 +58,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -91,8 +114,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -147,8 +169,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -194,8 +215,7 @@ EOF
     local to_format="$2"
     local valid_formats=(png jpg jpeg webp heic avif bmp tiff gif pdf PNG JPG JPEG HEIC)
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -247,8 +267,7 @@ EOF
 
     setopt local_options nullglob 2>/dev/null || true
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -317,8 +336,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -363,8 +381,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -409,8 +426,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -455,8 +471,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -501,8 +516,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -542,8 +556,7 @@ EOF
     local success_count=0
     local fail_count=0
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -612,8 +625,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
@@ -675,8 +687,7 @@ EOF
         return 1
     fi
 
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick not installed. Install with: brew install imagemagick" >&2
+    if ! _kit_require_imagemagick; then
         return 1
     fi
 
