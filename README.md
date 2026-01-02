@@ -4,9 +4,30 @@ A modular, extensible shell function toolkit for macOS/Linux with auto-discovery
 
 ## Platform Support
 
-**macOS & Linux**
+**macOS & Linux | Zsh Only**
 
-This toolkit is designed to work on both macOS and Linux. The `zed` function supports:
+This toolkit is designed to work on both macOS and Linux, but **requires the Zsh shell**.
+
+### Shell Requirements
+
+| Requirement | Status |
+|-------------|--------|
+| **Zsh** | ✅ Required (version 5.0+) |
+| Bash | ❌ Not supported |
+
+**Why Zsh only?**
+- The toolkit uses Zsh-specific features like arrays (`${(f)var}`), parameter expansion (`${${(%):-%x}:A:h}`), and completion system (`compdef`)
+- The loader (`loader.zsh`) and completion scripts use Zsh-specific syntax
+- Installing for Bash would require a separate loader and completion system
+
+### OS Support
+
+| OS | Status |
+|----|--------|
+| **macOS** | ✅ Fully supported |
+| **Linux** | ✅ Fully supported (Debian/Ubuntu, Fedora, Arch, openSUSE) |
+
+The `zed` function supports:
 - **macOS**: Uses Zed.app from `/Applications/Zed.app`
 - **Linux**: Uses the `zed` command from PATH
 
@@ -30,6 +51,31 @@ Clear development patterns, template generator, and validator make it easy for A
 Every function has built-in help: `kit my-function -h`
 
 ## Quick Start
+
+### Prerequisites
+
+**You must be using Zsh as your shell.** To check:
+
+```bash
+echo $SHELL  # Should show /bin/zsh or /usr/bin/zsh
+echo $ZSH_VERSION  # Should show a version number
+```
+
+If you're using Bash but want to switch to Zsh:
+
+```bash
+# macOS (default is already Zsh on modern macOS)
+# Just open a new terminal
+
+# Linux
+sudo apt install zsh  # Debian/Ubuntu
+sudo dnf install zsh  # Fedora
+sudo pacman -S zsh    # Arch
+
+# Then change your default shell
+chsh -s $(which zsh)
+# Log out and back in for changes to take effect
+```
 
 ### Installation
 
@@ -116,6 +162,7 @@ Shell and filesystem tools:
 - **mklink** — Create symbolic links with validation
 - **zed** — Open files in Zed editor (cross-platform)
 - **killports** — Kill processes using specified network ports
+- **uninstall** — Remove Kit's Toolkit configuration from your shell
 
 ### 📦 Dependencies
 Cross-platform dependency management:
@@ -428,11 +475,36 @@ If you see "defining function based on alias" errors, remove the old alias defin
 
 ## Uninstallation
 
-To uninstall Kit:
+To uninstall Kit, use the built-in uninstall command:
+
+```bash
+# Remove configuration only (keeps the kit-toolkit directory)
+kit uninstall
+
+# Remove configuration AND delete the kit-toolkit directory
+kit uninstall --purge
+```
+
+The uninstall command will:
+- Automatically detect your zsh config file (respects `ZDOTDIR`)
+- Create a timestamped backup before making changes
+- Remove the Kit configuration block from your config
+- Optionally delete the kit-toolkit directory with `--purge`
+
+To apply changes after uninstalling:
+```bash
+# Open a new terminal window, or
+source ~/.zshrc
+```
+
+**Manual Uninstallation:**
+
+If you prefer to uninstall manually:
 
 ```bash
 # 1. Remove Kit configuration from ~/.zshrc
 # Remove these lines:
+#   # Kit V2 - Shell Toolkit
 #   export KIT_EXT_DIR="..."
 #   source "$KIT_EXT_DIR/loader.zsh"
 
@@ -592,9 +664,17 @@ Use freely. Modify as needed.
 
 ## Version
 
-**v2.2.0** — Cross-platform dependency management
+**v2.3.0** — Uninstall command & documentation improvements
 
 ### Changelog
+- **v2.3.0** (2026-01-02)
+  - 🗑️ Added `uninstall` command - safely remove Kit configuration from your shell
+  - 🗑️ Added `--purge` option to also delete the kit-toolkit directory
+  - 🔒 Automatic backup creation before uninstalling
+  - 📁 Supports `ZDOTDIR` for custom zsh config locations
+  - 📝 Updated README with clear "Zsh Only" requirement documentation
+  - 📝 Updated README with uninstall command documentation
+  - 🔧 Improved tab completion for `uninstall --purge`
 - **v2.2.0** (2026-01-02)
   - 📦 Added `deps-install` command - cross-platform dependency installer
   - 📦 Added `deps-check` command - check status of all dependencies
