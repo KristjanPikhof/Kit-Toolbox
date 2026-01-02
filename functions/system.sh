@@ -284,6 +284,9 @@ EOF
         purge_dir=true
     fi
 
+    # Pattern to identify Kit configuration block (supports V2, V3, etc.)
+    local kit_marker_pattern='# Kit V[0-9]'
+
     # Check if KIT_EXT_DIR is set
     if [[ -z "$KIT_EXT_DIR" ]]; then
         echo "Error: KIT_EXT_DIR not found. Kit installation not detected." >&2
@@ -291,7 +294,7 @@ EOF
         echo "      KIT_EXT_DIR may not be set in this session." >&2
         echo "" >&2
         echo "You can still uninstall manually by removing the Kit configuration block" >&2
-        echo "from your ~/.zshrc file (look for the '# Kit V2' marker)." >&2
+        echo "from your ~/.zshrc file (look for lines starting with '# Kit V[0-9]')." >&2
         return 1
     fi
 
@@ -320,7 +323,7 @@ EOF
 
     # Find which config file has Kit installed
     for config_file in "${config_files[@]}"; do
-        if [[ -f "$config_file" ]] && grep -q "# Kit V2" "$config_file" 2>/dev/null; then
+        if [[ -f "$config_file" ]] && grep -qE "$kit_marker_pattern" "$config_file" 2>/dev/null; then
             config_found=true
             active_config="$config_file"
             break
@@ -338,7 +341,7 @@ EOF
         done
         echo "" >&2
         echo "It may have already been removed, or Kit was configured in a custom location." >&2
-        echo "Please check your zsh configuration manually for the '# Kit V2' marker." >&2
+        echo "Please check your zsh configuration manually for the '# Kit V[0-9]' marker." >&2
         return 1
     fi
 
@@ -355,26 +358,26 @@ EOF
     # Use temp file for processing
     local tmp_file="$active_config.tmp"
 
-    # Remove lines between "# Kit V2" and the line that sources loader.zsh
+    # Remove lines between the Kit marker and the line that sources loader.zsh
     # Using awk for cross-platform compatibility (macOS/BSD and Linux/GNU)
     # Pattern handles various quoting styles:
     #   source "$KIT_EXT_DIR/loader.zsh"
     #   source $KIT_EXT_DIR/loader.zsh
     #   . "$KIT_EXT_DIR/loader.zsh"
     #   . $KIT_EXT_DIR/loader.zsh
-    awk '
-        /# Kit V2/ { in_kit_block = 1; next }
+    awk -v marker="$kit_marker_pattern" '
+        $0 ~ marker { in_kit_block = 1; next }
         in_kit_block && /loader\.zsh/ { in_kit_block = 0; next }
         !in_kit_block { print }
     ' "$active_config" > "$tmp_file"
     mv "$tmp_file" "$active_config"
 
-    # Verify configuration was removed by checking for the Kit V2 marker
-    if ! grep -q "# Kit V2" "$active_config" 2>/dev/null; then
+    # Verify configuration was removed by checking for the Kit marker
+    if ! grep -qE "$kit_marker_pattern" "$active_config" 2>/dev/null; then
         echo "Successfully removed Kit configuration from $active_config"
     else
         echo "Warning: Some Kit configuration may remain in $active_config" >&2
-        echo "Please check manually for the '# Kit V2' marker and source lines" >&2
+        echo "Please check manually for the '# Kit V[0-9]' marker and source lines" >&2
     fi
 
     # Ask about removing kit directory (or do it if --purge was used)
