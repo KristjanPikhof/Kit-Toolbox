@@ -2,7 +2,7 @@
 # Category: System Utilities
 # Description: Shell and filesystem utilities
 # Dependencies: none (Zed editor for zed function)
-# Functions: mklink, zed, killports
+# Functions: mklink, zed, killports, uninstall
 
 # Detect the operating system
 _kit_detect_os() {
@@ -260,6 +260,141 @@ EOF
         echo "Failed to kill processes on $failed_count port(s)" >&2
         return 1
     fi
+
+    return 0
+}
+
+# Uninstall Kit's Toolkit from the system
+uninstall() {
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        cat << EOF
+Usage: kit uninstall [--purge]
+Description: Remove Kit's Toolkit configuration from your zsh
+Options:
+  --purge    Also remove the Kit installation directory
+Examples:
+  kit uninstall           # Remove config only, keep directory
+  kit uninstall --purge   # Remove config and delete directory
+EOF
+        return 0
+    fi
+
+    local purge_dir=false
+    if [[ "$1" == "--purge" ]]; then
+        purge_dir=true
+    fi
+
+    # Check if KIT_EXT_DIR is set
+    if [[ -z "$KIT_EXT_DIR" ]]; then
+        echo "Error: KIT_EXT_DIR not found. Kit installation not detected." >&2
+        echo "Note: If you uninstalled Kit in a different terminal session," >&2
+        echo "      KIT_EXT_DIR may not be set in this session." >&2
+        echo "" >&2
+        echo "You can still uninstall manually by removing the Kit configuration block" >&2
+        echo "from your ~/.zshrc file (look for the '# Kit V2' marker)." >&2
+        return 1
+    fi
+
+    # Verify the directory exists and looks like a kit installation
+    if [[ ! -d "$KIT_EXT_DIR" ]]; then
+        echo "Warning: KIT_EXT_DIR '$KIT_EXT_DIR' does not exist." >&2
+        echo "The Kit directory may have already been removed." >&2
+        return 1
+    fi
+
+    if [[ ! -f "$KIT_EXT_DIR/loader.zsh" ]]; then
+        echo "Warning: '$KIT_EXT_DIR' does not contain a valid Kit installation." >&2
+        echo "Expected to find: loader.zsh" >&2
+        return 1
+    fi
+
+    # Detect zsh config file (respects ZDOTDIR)
+    local zdotdir="${ZDOTDIR:-$HOME}"
+    # Build config file list, avoiding duplicates when ZDOTDIR is not set
+    local config_files=("$zdotdir/.zshrc")
+    [[ -n "$ZDOTDIR" ]] && config_files+=("$HOME/.zshrc")
+    config_files+=("$zdotdir/.zprofile")
+    [[ -n "$ZDOTDIR" ]] && config_files+=("$HOME/.zprofile")
+    local config_found=false
+    local active_config=""
+
+    # Find which config file has Kit installed
+    for config_file in "${config_files[@]}"; do
+        if [[ -f "$config_file" ]] && grep -q "# Kit V2" "$config_file" 2>/dev/null; then
+            config_found=true
+            active_config="$config_file"
+            break
+        fi
+    done
+
+    if [[ "$config_found" == false ]]; then
+        echo "Warning: No Kit configuration found in checked locations:" >&2
+        for cf in "${config_files[@]}"; do
+            if [[ -f "$cf" ]]; then
+                echo "  - $cf (no Kit config found)" >&2
+            else
+                echo "  - $cf (file does not exist)" >&2
+            fi
+        done
+        echo "" >&2
+        echo "It may have already been removed, or Kit was configured in a custom location." >&2
+        echo "Please check your zsh configuration manually for the '# Kit V2' marker." >&2
+        return 1
+    fi
+
+    echo "Found Kit configuration in: $active_config"
+
+    # Create backup before making changes
+    local backup="$active_config.backup.uninstall.$(date +%Y%m%d_%H%M%S)"
+    cp "$active_config" "$backup"
+    echo "Created backup: $backup"
+
+    # Remove Kit configuration from config file
+    echo "Removing Kit configuration from $active_config..."
+
+    # Use temp file for processing
+    local tmp_file="$active_config.tmp"
+
+    # Remove lines between "# Kit V2" and the line that sources loader.zsh
+    # Using awk for cross-platform compatibility (macOS/BSD and Linux/GNU)
+    # Pattern handles various quoting styles:
+    #   source "$KIT_EXT_DIR/loader.zsh"
+    #   source $KIT_EXT_DIR/loader.zsh
+    #   . "$KIT_EXT_DIR/loader.zsh"
+    #   . $KIT_EXT_DIR/loader.zsh
+    awk '
+        /# Kit V2/ { in_kit_block = 1; next }
+        in_kit_block && /loader\.zsh/ { in_kit_block = 0; next }
+        !in_kit_block { print }
+    ' "$active_config" > "$tmp_file"
+    mv "$tmp_file" "$active_config"
+
+    # Verify configuration was removed by checking for the Kit V2 marker
+    if ! grep -q "# Kit V2" "$active_config" 2>/dev/null; then
+        echo "Successfully removed Kit configuration from $active_config"
+    else
+        echo "Warning: Some Kit configuration may remain in $active_config" >&2
+        echo "Please check manually for the '# Kit V2' marker and source lines" >&2
+    fi
+
+    # Ask about removing kit directory (or do it if --purge was used)
+    echo ""
+    if [[ "$purge_dir" == true ]]; then
+        echo "Removing Kit installation directory: $KIT_EXT_DIR"
+        rm -rf "$KIT_EXT_DIR"
+        echo "Kit installation directory removed"
+    else
+        echo "Kit installation directory kept at: $KIT_EXT_DIR"
+        echo "To remove it later, run: kit uninstall --purge"
+    fi
+
+    # Show how to reload
+    echo ""
+    echo "Uninstall complete. To apply changes:"
+    echo "  1. Open a new terminal window, or"
+    echo "  2. Run: source ~/.zshrc"
+    echo ""
+    echo "Your backup is saved at: $backup"
 
     return 0
 }
