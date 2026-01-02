@@ -1,10 +1,10 @@
 # editor.conf - Editor shortcuts for opening files/folders
-# Format: editor_name|command|description
+# Format: shortcut_name|full_command|description
 #
 # Fields (pipe-separated):
-#   1. Function name (used with: kit <name> <file/folder>)
-#   2. Full command to open the editor
-#   3. Description
+# 1. Shortcut name (used with: kit <name> <file/folder>)
+# 2. Full command to open the editor
+# 3. Description
 #
 # Note: After adding editors to your editor.conf, reload with:
 #       source $KIT_EXT_DIR/loader.zsh
@@ -17,47 +17,14 @@
 #   Use: open -a "AppName"
 #   Example: zed|open -a Zed|Zed editor
 #
-# macOS Terminal Editors & Linux:
-#   Use: the command directly (must be in PATH)
-#   Example: code|code|VS Code
-#   Example: nvim|nvim|Neovim
-#
 # Linux GUI Apps:
 #   Use: the command directly (must be in PATH)
 #   Example: code|code|VS Code
-#   Example: subl|subl|Sublime Text
-#
-# ============================================================================
-# EXAMPLES
-# ============================================================================
-#
-# Usage:
-#   kit code myfile.md      # Opens myfile.md in VS Code
-#   kit zed .               # Opens current folder in Zed
-#   kit nvim config.yaml    # Opens config.yaml in Neovim
 #
 # ============================================================================
 
-# Popular cross-platform editors (work on both macOS and Linux)
+# Popular editors
 code|code|VS Code
+zed|open -a Zed|Zed editor (macOS)
 cursor|cursor|Cursor AI editor
 subl|subl|Sublime Text
-
-# macOS-specific GUI apps (use 'open -a' for GUI applications)
-zed|open -a Zed|Zed editor (macOS)
-
-# Terminal-based editors (work on both macOS and Linux)
-nvim|nvim|Neovim
-vim|vim|Vim
-hx|hx|Helix editor
-emacs|emacs|GNU Emacs
-
-# JetBrains IDEs
-idea|idea|IntelliJ IDEA
-webstorm|webstorm|WebStorm
-pycharm|pycharm|PyCharm
-rider|rider|Rider
-
-# Other editors
-nano|nano|Nano editor
-micro|micro|Micro editor
