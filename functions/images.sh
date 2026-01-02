@@ -472,22 +472,26 @@ _kit_require_imagemagick() {
 # Image Resize by Width (height auto-calculated to preserve aspect ratio)
 img-resize-width() {
     local force=false
+    local dry_run=false
+    local recursive=false
     local width=""
-    local input=""
+    local target=""
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-resize-width <width> <file> [options]
+Usage: kit img-resize-width <width> <file|directory> [options]
 Description: Simple resize by width only, height auto-calculated, preserves aspect ratio
 Options:
-  -f, --force    Overwrite output file if it exists
+  -f, --force      Overwrite output file if it exists
+  -n, --dry-run    Show what would be resized without making changes
+  -r, --recursive  Process directories recursively
 Examples:
   kit img-resize-width 800 photo.jpg
-  kit img-resize-width 1920 landscape.png
-  kit img-resize-width 800 photo.jpg --force
+  kit img-resize-width 1920 . --recursive
+  kit img-resize-width 800 . --dry-run
 Output: Creates photo-resized.jpg
 EOF
                 return 0
@@ -496,11 +500,19 @@ EOF
                 force=true
                 shift
                 ;;
+            -n|--dry-run)
+                dry_run=true
+                shift
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
+                ;;
             *)
                 if [[ -z "$width" ]]; then
                     width="$1"
-                elif [[ -z "$input" ]]; then
-                    input="$1"
+                elif [[ -z "$target" ]]; then
+                    target="$1"
                 fi
                 shift
                 ;;
@@ -512,22 +524,21 @@ EOF
         return 2
     fi
 
-    if [[ -z "$input" ]]; then
-        echo "Error: Missing input file" >&2
+    if [[ -z "$target" ]]; then
+        echo "Error: Missing target file or directory" >&2
         return 2
     fi
 
     # Sanitize filename to prevent injection attacks
-    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
-    if [[ "$input" == *"|"* ]] || [[ "$input" == *"&"* ]] || \
-       [[ "$input" == *'$'* ]] || [[ "$input" == *";"* ]] || \
-       [[ "$input" == *"<"* ]] || [[ "$input" == *">"* ]]; then
-        echo "Error: Filename contains invalid characters" >&2
+    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
+       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
+       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
+        echo "Error: Target contains invalid characters" >&2
         return 1
     fi
 
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
+    if [[ ! -e "$target" ]]; then
+        echo "Error: Target '$target' does not exist" >&2
         return 1
     fi
 
@@ -535,110 +546,295 @@ EOF
         return 1
     fi
 
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
+    _process_single_resize_width() {
+        local input="$1"
+        local width="$2"
+        local force="$3"
+        local dry_run="$4"
 
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        if [[ "$force" == true ]]; then
-            echo "Warning: Overwriting existing file '$output'" >&2
-            rm -f "$output"
+        if ! _is_image_file "$input"; then
+            return 0
+        fi
+
+        local filename="${input%.*}"
+        local extension="${input##*.}"
+        local output="${filename}-resized.${extension}"
+
+        # Prevent double resizing
+        if [[ "$filename" == *"-resized" ]]; then
+            return 0
+        fi
+
+        # Check if output file exists
+        if [[ -f "$output" ]]; then
+            if [[ "$force" == true ]]; then
+                if [[ "$dry_run" == false ]]; then
+                    rm -f "$output"
+                fi
+            else
+                echo "⚠️  Skipping: '$input' (output '$output' already exists)" >&2
+                return 1
+            fi
+        fi
+
+        if [[ "$dry_run" == true ]]; then
+            echo "Would resize: $input -> $output"
+            return 0
+        fi
+
+        if magick "$input" -resize "$width" "$output" 2>/dev/null; then
+            echo "✅ Created: $output"
+            return 0
         else
-            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            echo "Error: Resize failed for $input" >&2
             return 1
         fi
+    }
+
+    if [[ -f "$target" ]]; then
+        _process_single_resize_width "$target" "$width" "$force" "$dry_run"
+        return $?
     fi
 
-    if magick "$input" -resize "$width" "$output" 2>/dev/null; then
-        echo "✅ Created: $output"
+    if [[ -d "$target" ]]; then
+        local count=0
+        local failed=0
+        
+        # Build find command pattern
+        local find_pattern="$target/*"
+        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
+
+        # Use setopt for nullglob in zsh
+        setopt local_options nullglob 2>/dev/null || true
+
+        for file in $~find_pattern; do
+            [[ -f "$file" ]] || continue
+            if ! _is_image_file "$file"; then
+                continue
+            fi
+            if _process_single_resize_width "$file" "$width" "$force" "$dry_run"; then
+                ((count++))
+            else
+                ((failed++))
+            fi
+        done
+
+        echo ""
+        if [[ "$dry_run" == true ]]; then
+            echo "Would resize $count file(s)"
+        else
+            echo "Resized $count file(s)"
+        fi
+        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
         return 0
-    else
-        echo "Error: Resize failed for $input" >&2
-        return 1
     fi
 }
 
 # Image Resize by Percentage (using Lanczos interpolation for quality - ideal for upscaling)
 img-resize-percentage() {
-    if [[ "$1" == "-h" || -z "$1" ]]; then
-        cat << EOF
-Usage: kit img-resize-percentage <percentage> <file>
-Description: Resize image by percentage using Lanczos filter for high quality
-Features: Uses Lanczos interpolation - ideal for upscaling, reduces blur
-Examples:
-  kit img-resize-percentage 200 photo.jpg    # Double size (upscale)
-  kit img-resize-percentage 50 large.png     # Reduce to 50%
-  kit img-resize-percentage 150 image.jpg    # Upscale to 150%
-Output: Creates photo-resized.jpg
-EOF
-        return 0
-    fi
-
-    if [[ -z "$2" ]]; then
-        echo "Error: Missing input file" >&2
-        return 2
-    fi
-
-    # Sanitize filename to prevent injection attacks
-    if [[ "$2" == *"|"* ]] || [[ "$2" == *"&"* ]] || \
-       [[ "$2" == *'$'* ]] || [[ "$2" == *";"* ]] || \
-       [[ "$2" == *"<"* ]] || [[ "$2" == *">"* ]]; then
-        echo "Error: Filename contains invalid characters" >&2
-        return 1
-    fi
-
-    if [[ ! -f "$2" ]]; then
-        echo "Error: Input file '$2' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require_imagemagick; then
-        return 1
-    fi
-
-    if ! [[ "$1" =~ ^[0-9]+$ ]]; then
-        echo "Error: Percentage must be a number (e.g., 50, 150, 200)" >&2
-        return 1
-    fi
-
-    local input="$2"
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
-
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
-    fi
-
-    if magick "$input" -filter Lanczos -resize "$1%" "$output" 2>/dev/null; then
-        echo "✅ Created: $output (resized to $1% with Lanczos filter)"
-        return 0
-    else
-        echo "Error: Percentage resize failed for $input" >&2
-        return 1
-    fi
-}
-
-# Image Optimization (strips metadata and compresses)
-img-optimize() {
     local force=false
-    local input=""
+    local dry_run=false
+    local recursive=false
+    local percentage=""
+    local target=""
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-optimize <file> [options]
+Usage: kit img-resize-percentage <percentage> <file|directory> [options]
+Description: Resize image by percentage using Lanczos filter for high quality
+Features: Uses Lanczos interpolation - ideal for upscaling, reduces blur
+Options:
+  -f, --force      Overwrite output file if it exists
+  -n, --dry-run    Show what would be resized without making changes
+  -r, --recursive  Process directories recursively
+Examples:
+  kit img-resize-percentage 200 photo.jpg    # Double size (upscale)
+  kit img-resize-percentage 50 . --recursive # Half size in current dir
+  kit img-resize-percentage 150 . --dry-run
+Output: Creates photo-resized.jpg
+EOF
+                return 0
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            -n|--dry-run)
+                dry_run=true
+                shift
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
+                ;;
+            *)
+                if [[ -z "$percentage" ]]; then
+                    percentage="$1"
+                elif [[ -z "$target" ]]; then
+                    target="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$percentage" ]]; then
+        echo "Error: Missing percentage parameter" >&2
+        return 2
+    fi
+
+    if [[ -z "$target" ]]; then
+        echo "Error: Missing target file or directory" >&2
+        return 2
+    fi
+
+    if ! [[ "$percentage" =~ ^[0-9]+$ ]]; then
+        echo "Error: Percentage must be a number (e.g., 50, 150, 200)" >&2
+        return 1
+    fi
+
+    # Sanitize filename to prevent injection attacks
+    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
+       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
+       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
+        echo "Error: Target contains invalid characters" >&2
+        return 1
+    fi
+
+    if [[ ! -e "$target" ]]; then
+        echo "Error: Target '$target' does not exist" >&2
+        return 1
+    fi
+
+    if ! _kit_require_imagemagick; then
+        return 1
+    fi
+
+    _process_single_resize_percentage() {
+        local input="$1"
+        local percentage="$2"
+        local force="$3"
+        local dry_run="$4"
+
+        if ! _is_image_file "$input"; then
+            return 0
+        fi
+
+        local filename="${input%.*}"
+        local extension="${input##*.}"
+        local output="${filename}-resized.${extension}"
+
+        # Prevent double resizing
+        if [[ "$filename" == *"-resized" ]]; then
+            return 0
+        fi
+
+        # Check if output file exists
+        if [[ -f "$output" ]]; then
+            if [[ "$force" == true ]]; then
+                if [[ "$dry_run" == false ]]; then
+                    rm -f "$output"
+                fi
+            else
+                echo "⚠️  Skipping: '$input' (output '$output' already exists)" >&2
+                return 1
+            fi
+        fi
+
+        if [[ "$dry_run" == true ]]; then
+            echo "Would resize: $input -> $output"
+            return 0
+        fi
+
+        if magick "$input" -filter Lanczos -resize "$percentage%" "$output" 2>/dev/null; then
+            echo "✅ Created: $output (resized to $percentage% with Lanczos filter)"
+            return 0
+        else
+            echo "Error: Percentage resize failed for $input" >&2
+            return 1
+        fi
+    }
+
+    if [[ -f "$target" ]]; then
+        _process_single_resize_percentage "$target" "$percentage" "$force" "$dry_run"
+        return $?
+    fi
+
+    if [[ -d "$target" ]]; then
+        local count=0
+        local failed=0
+        
+        # Build find command pattern
+        local find_pattern="$target/*"
+        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
+
+        # Use setopt for nullglob in zsh
+        setopt local_options nullglob 2>/dev/null || true
+
+        for file in $~find_pattern; do
+            [[ -f "$file" ]] || continue
+            if ! _is_image_file "$file"; then
+                continue
+            fi
+            if _process_single_resize_percentage "$file" "$percentage" "$force" "$dry_run"; then
+                ((count++))
+            else
+                ((failed++))
+            fi
+        done
+
+        echo ""
+        if [[ "$dry_run" == true ]]; then
+            echo "Would resize $count file(s)"
+        else
+            echo "Resized $count file(s)"
+        fi
+        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
+        return 0
+    fi
+}
+
+# Helper to check if a file is a supported image
+_is_image_file() {
+    local file="$1"
+    local extension="${file##*.}"
+    extension="${extension% }"
+    extension="${extension# }"
+
+    local -a extensions=(jpg jpeg png gif webp bmp tiff tif heic heif avif svg ico)
+    for ext in "${extensions[@]}"; do
+        if [[ "${extension:l}" == "${ext:l}" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Image Optimization (strips metadata and compresses)
+img-optimize() {
+    local force=false
+    local dry_run=false
+    local recursive=false
+    local target=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit img-optimize <file|directory> [options]
 Description: Optimize image by stripping metadata and compressing
 Effect: Strips EXIF/metadata and sets quality to 85%
 Options:
-  -f, --force    Overwrite output file if it exists
+  -f, --force      Overwrite output file if it exists
+  -n, --dry-run    Show what would be optimized without making changes
+  -r, --recursive  Process directories recursively
 Examples:
   kit img-optimize photo.jpg
+  kit img-optimize . --recursive --dry-run
   kit img-optimize image.png --force
 Output: Creates photo-optimized.jpg
 EOF
@@ -648,31 +844,38 @@ EOF
                 force=true
                 shift
                 ;;
+            -n|--dry-run)
+                dry_run=true
+                shift
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
+                ;;
             *)
-                if [[ -z "$input" ]]; then
-                    input="$1"
+                if [[ -z "$target" ]]; then
+                    target="$1"
                 fi
                 shift
                 ;;
         esac
     done
 
-    if [[ -z "$input" ]]; then
-        echo "Error: Missing input file" >&2
+    if [[ -z "$target" ]]; then
+        echo "Error: Missing target file or directory" >&2
         return 2
     fi
 
     # Sanitize filename to prevent injection attacks
-    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
-    if [[ "$input" == *"|"* ]] || [[ "$input" == *"&"* ]] || \
-       [[ "$input" == *'$'* ]] || [[ "$input" == *";"* ]] || \
-       [[ "$input" == *"<"* ]] || [[ "$input" == *">"* ]]; then
-        echo "Error: Filename contains invalid characters" >&2
+    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
+       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
+       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
+        echo "Error: Target contains invalid characters" >&2
         return 1
     fi
 
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
+    if [[ ! -e "$target" ]]; then
+        echo "Error: Target '$target' does not exist" >&2
         return 1
     fi
 
@@ -680,81 +883,165 @@ EOF
         return 1
     fi
 
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-optimized.${extension}"
+    _process_single_optimize() {
+        local input="$1"
+        local force="$2"
+        local dry_run="$3"
 
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        if [[ "$force" == true ]]; then
-            echo "Warning: Overwriting existing file '$output'" >&2
-            rm -f "$output"
+        if ! _is_image_file "$input"; then
+            return 0
+        fi
+
+        local filename="${input%.*}"
+        local extension="${input##*.}"
+        local output="${filename}-optimized.${extension}"
+
+        # Prevent double optimization
+        if [[ "$filename" == *"-optimized" ]]; then
+            return 0
+        fi
+
+        # Check if output file exists
+        if [[ -f "$output" ]]; then
+            if [[ "$force" == true ]]; then
+                if [[ "$dry_run" == false ]]; then
+                    rm -f "$output"
+                fi
+            else
+                echo "⚠️  Skipping: '$input' (output '$output' already exists)" >&2
+                return 1
+            fi
+        fi
+
+        if [[ "$dry_run" == true ]]; then
+            echo "Would optimize: $input -> $output"
+            return 0
+        fi
+
+        if magick "$input" -strip -quality 85 "$output" 2>/dev/null; then
+            echo "✅ Created: $output"
+            return 0
         else
-            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            echo "Error: Optimization failed for $input" >&2
             return 1
         fi
+    }
+
+    if [[ -f "$target" ]]; then
+        _process_single_optimize "$target" "$force" "$dry_run"
+        return $?
     fi
 
-    if magick "$input" -strip -quality 85 "$output" 2>/dev/null; then
-        echo "✅ Created: $output"
+    if [[ -d "$target" ]]; then
+        local count=0
+        local failed=0
+        
+        # Build find command pattern
+        local find_pattern="$target/*"
+        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
+
+        # Use setopt for nullglob in zsh
+        setopt local_options nullglob 2>/dev/null || true
+
+        for file in $~find_pattern; do
+            [[ -f "$file" ]] || continue
+            if ! _is_image_file "$file"; then
+                continue
+            fi
+            if _process_single_optimize "$file" "$force" "$dry_run"; then
+                ((count++))
+            else
+                ((failed++))
+            fi
+        done
+
+        echo ""
+        if [[ "$dry_run" == true ]]; then
+            echo "Would optimize $count file(s)"
+        else
+            echo "Optimized $count file(s)"
+        fi
+        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
         return 0
-    else
-        echo "Error: Optimization failed for $input" >&2
-        return 1
     fi
 }
 
 # Unified Image Format Conversion
 img-convert() {
-    if [[ "$1" == "-h" || "$1" == "--help" || $# -lt 2 ]]; then
-        cat << EOF
-Usage: kit img-convert <from_format> <to_format>
-Description: Convert all images of one format to another format in current directory
+    local target="."
+    local from_format=""
+    local to_format=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit img-convert <from_format> <to_format> [directory]
+Description: Convert all images of one format to another format
 Supported formats: png, jpg, jpeg, webp, heic, avif, bmp, tiff, gif, pdf
 Examples:
-  kit img-convert png jpg         # Convert all PNG to JPG
-  kit img-convert heic webp       # Convert all HEIC to WebP
-  kit img-convert jpg png         # Convert all JPG to PNG
-Output: Creates converted/ directory with converted files
+  kit img-convert png jpg         # Convert all PNG to JPG in current dir
+  kit img-convert heic webp ./old # Convert all HEIC to WebP in ./old
+  kit img-convert jpg png .       # Convert all JPG to PNG in current dir
+Output: Creates <directory>/converted/ directory with converted files
 EOF
-        return 0
+                return 0
+                ;;
+            *)
+                if [[ -z "$from_format" ]]; then
+                    from_format="$1"
+                elif [[ -z "$to_format" ]]; then
+                    to_format="$1"
+                elif [[ -z "$target" || "$target" == "." ]]; then
+                    target="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$from_format" || -z "$to_format" ]]; then
+        echo "Error: Missing format parameters" >&2
+        return 2
     fi
 
-    setopt local_options nullglob 2>/dev/null || true
-
-    local from_format="$1"
-    local to_format="$2"
-    local valid_formats=(png jpg jpeg webp heic avif bmp tiff gif pdf PNG JPG JPEG HEIC)
+    if [[ ! -d "$target" ]]; then
+        echo "Error: Directory '$target' does not exist" >&2
+        return 1
+    fi
 
     if ! _kit_require_imagemagick; then
         return 1
     fi
 
     # Find all matching files (case-insensitive)
-    local input_files=()
-    for ext in "$from_format" "${from_format:u}" "${from_format:l}"; do
-        for file in *.$ext; do
-            [[ -f "$file" ]] && input_files+=("$file")
-        done
+    setopt local_options nullglob 2>/dev/null || true
+    local -a input_files=()
+    
+    # Check for formats in target directory
+    for file in "$target"/*.{"$from_format","${from_format:u}","${from_format:l}"}; do
+        [[ -f "$file" ]] && input_files+=("$file")
     done
 
     if [[ ${#input_files[@]} -eq 0 ]]; then
-        echo "Error: No .$from_format files found in current directory" >&2
+        echo "Error: No .$from_format files found in '$target'" >&2
         return 1
     fi
 
-    echo "Converting ${#input_files[@]} file(s) from $from_format to $to_format..."
+    echo "Converting ${#input_files[@]} file(s) from $from_format to $to_format in '$target'..."
 
-    # Create output directory
-    mkdir -p converted || {
-        echo "Error: Cannot create 'converted' directory" >&2
+    # Create output directory relative to target
+    local out_dir="${target}/converted"
+    mkdir -p "$out_dir" || {
+        echo "Error: Cannot create '$out_dir' directory" >&2
         return 1
     }
 
     # Convert files
-    if magick mogrify -path converted -format "$to_format" -quality 90 -auto-orient "${input_files[@]}" 2>/dev/null; then
-        local count=$(ls -1 converted/*.$to_format 2>/dev/null | wc -l | tr -d ' ')
-        echo "✅ Converted $count file(s) to $to_format in ./converted"
+    if magick mogrify -path "$out_dir" -format "$to_format" -quality 90 -auto-orient "${input_files[@]}" 2>/dev/null; then
+        local count=$(ls -1 "$out_dir"/*."$to_format" 2>/dev/null | wc -l | tr -d ' ')
+        echo "✅ Converted $count file(s) to $to_format in $out_dir"
         return 0
     else
         echo "Error: Conversion failed" >&2
@@ -764,42 +1051,60 @@ EOF
 
 # Optimize images to WebP format with maximum quality and compression
 img-optimize-to-webp() {
-    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        cat << EOF
-Usage: kit img-optimize-to-webp
+    local target="."
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit img-optimize-to-webp [directory]
 Description: Convert all supported images (PNG, JPG, HEIC) to optimized WebP format
 Features: Maximum quality (90), best compression (method=6, pass=10), sharp-yuv enabled
 Supported: PNG, JPG, JPEG, HEIC
-Example: kit img-optimize-to-webp
-Output: Creates optimized/ directory with WebP files
+Example: 
+  kit img-optimize-to-webp        # Current directory
+  kit img-optimize-to-webp ./pics # Process ./pics
+Output: Creates <directory>/optimized/ directory with WebP files
 EOF
-        return 0
-    fi
+                return 0
+                ;;
+            *)
+                if [[ -z "$target" || "$target" == "." ]]; then
+                    target="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
 
-    setopt local_options nullglob 2>/dev/null || true
+    if [[ ! -d "$target" ]]; then
+        echo "Error: Directory '$target' does not exist" >&2
+        return 1
+    fi
 
     if ! _kit_require_imagemagick; then
         return 1
     fi
 
     # Find all supported image files
-    local input_files=()
-    for ext in png jpg jpeg HEIC heic PNG JPG JPEG; do
-        for file in *.$ext; do
-            [[ -f "$file" ]] && input_files+=("$file")
-        done
+    setopt local_options nullglob 2>/dev/null || true
+    local -a input_files=()
+    for file in "$target"/*.{png,jpg,jpeg,HEIC,heic,PNG,JPG,JPEG}; do
+        [[ -f "$file" ]] && input_files+=("$file")
     done
 
     if [[ ${#input_files[@]} -eq 0 ]]; then
-        echo "Error: No supported image files found (PNG, JPG, HEIC)" >&2
+        echo "Error: No supported image files found in '$target' (PNG, JPG, HEIC)" >&2
         return 1
     fi
 
-    echo "Optimizing ${#input_files[@]} image(s) to WebP with maximum quality..."
+    echo "Optimizing ${#input_files[@]} image(s) to WebP in '$target'..."
 
-    # Create output directory
-    mkdir -p optimized || {
-        echo "Error: Cannot create 'optimized' directory" >&2
+    # Create output directory relative to target
+    local out_dir="${target}/optimized"
+    mkdir -p "$out_dir" || {
+        echo "Error: Cannot create '$out_dir' directory" >&2
         return 1
     }
 
@@ -807,9 +1112,9 @@ EOF
     local WEBP_METHOD=6  # Compression method: 0=fast, 6=best compression (slower)
     local WEBP_PASS=10   # Number of compression passes: higher = better compression (slower)
 
-    if magick mogrify -path optimized -format webp -quality 90 -define webp:method=$WEBP_METHOD -define webp:pass=$WEBP_PASS -define webp:use-sharp-yuv=1 "${input_files[@]}" 2>/dev/null; then
-        local count=$(ls -1 optimized/*.webp 2>/dev/null | wc -l | tr -d ' ')
-        echo "✅ Optimized $count file(s) to WebP in ./optimized"
+    if magick mogrify -path "$out_dir" -format webp -quality 90 -define webp:method=$WEBP_METHOD -define webp:pass=$WEBP_PASS -define webp:use-sharp-yuv=1 "${input_files[@]}" 2>/dev/null; then
+        local count=$(ls -1 "$out_dir"/*.webp 2>/dev/null | wc -l | tr -d ' ')
+        echo "✅ Optimized $count file(s) to WebP in $out_dir"
         return 0
     else
         echo "Error: Optimization failed" >&2
@@ -824,22 +1129,26 @@ EOF
 # General image resize preserving aspect ratio
 img-resize() {
     local force=false
+    local dry_run=false
+    local recursive=false
     local size=""
-    local input=""
+    local target=""
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-resize <width>x<height> <file> [options]
+Usage: kit img-resize <width>x<height> <file|directory> [options]
 Description: Resize image preserving aspect ratio, output has -resized suffix
 Options:
-  -f, --force    Overwrite output file if it exists
+  -f, --force      Overwrite output file if it exists
+  -n, --dry-run    Show what would be resized without making changes
+  -r, --recursive  Process directories recursively
 Examples:
   kit img-resize 800x600 photo.jpg        # Fit within 800x600
-  kit img-resize 1024 landscape.png       # Width 1024, height auto
-  kit img-resize 1920x1080 video_frame.jpg --force
+  kit img-resize 1024 . --recursive       # Width 1024 in current dir
+  kit img-resize 1920x1080 . --dry-run
 Output: Creates photo-resized.jpg
 EOF
                 return 0
@@ -848,11 +1157,19 @@ EOF
                 force=true
                 shift
                 ;;
+            -n|--dry-run)
+                dry_run=true
+                shift
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
+                ;;
             *)
                 if [[ -z "$size" ]]; then
                     size="$1"
-                elif [[ -z "$input" ]]; then
-                    input="$1"
+                elif [[ -z "$target" ]]; then
+                    target="$1"
                 fi
                 shift
                 ;;
@@ -864,17 +1181,21 @@ EOF
         return 2
     fi
 
-    if [[ -z "$input" ]]; then
-        echo "Error: Missing input file" >&2
+    if [[ -z "$target" ]]; then
+        echo "Error: Missing target file or directory" >&2
         return 2
     fi
 
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
+    # Sanitize filename to prevent injection attacks
+    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
+       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
+       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
+        echo "Error: Target contains invalid characters" >&2
+        return 1
+    fi
 
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
+    if [[ ! -e "$target" ]]; then
+        echo "Error: Target '$target' does not exist" >&2
         return 1
     fi
 
@@ -882,23 +1203,87 @@ EOF
         return 1
     fi
 
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        if [[ "$force" == true ]]; then
-            echo "Warning: Overwriting existing file '$output'" >&2
-            rm -f "$output"
+    _process_single_resize() {
+        local input="$1"
+        local size="$2"
+        local force="$3"
+        local dry_run="$4"
+
+        if ! _is_image_file "$input"; then
+            return 0
+        fi
+
+        local filename="${input%.*}"
+        local extension="${input##*.}"
+        local output="${filename}-resized.${extension}"
+
+        # Prevent double resizing
+        if [[ "$filename" == *"-resized" ]]; then
+            return 0
+        fi
+
+        # Check if output file exists
+        if [[ -f "$output" ]]; then
+            if [[ "$force" == true ]]; then
+                if [[ "$dry_run" == false ]]; then
+                    rm -f "$output"
+                fi
+            else
+                echo "⚠️  Skipping: '$input' (output '$output' already exists)" >&2
+                return 1
+            fi
+        fi
+
+        if [[ "$dry_run" == true ]]; then
+            echo "Would resize: $input -> $output"
+            return 0
+        fi
+
+        if magick "$input" -resize "$size" "$output" 2>/dev/null; then
+            echo "✅ Created: $output"
+            return 0
         else
-            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            echo "Error: Resize failed for $input" >&2
             return 1
         fi
+    }
+
+    if [[ -f "$target" ]]; then
+        _process_single_resize "$target" "$size" "$force" "$dry_run"
+        return $?
     fi
 
-    if magick "$input" -resize "$size" "$output" 2>/dev/null; then
-        echo "✅ Created: $output"
+    if [[ -d "$target" ]]; then
+        local count=0
+        local failed=0
+        
+        # Build find command pattern
+        local find_pattern="$target/*"
+        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
+
+        # Use setopt for nullglob in zsh
+        setopt local_options nullglob 2>/dev/null || true
+
+        for file in $~find_pattern; do
+            [[ -f "$file" ]] || continue
+            if ! _is_image_file "$file"; then
+                continue
+            fi
+            if _process_single_resize "$file" "$size" "$force" "$dry_run"; then
+                ((count++))
+            else
+                ((failed++))
+            fi
+        done
+
+        echo ""
+        if [[ "$dry_run" == true ]]; then
+            echo "Would resize $count file(s)"
+        else
+            echo "Resized $count file(s)"
+        fi
+        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
         return 0
-    else
-        echo "Error: Resize failed for $input" >&2
-        return 1
     fi
 }
 
