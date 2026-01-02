@@ -1,8 +1,401 @@
 # images.sh - Image manipulation utilities using ImageMagick v7
 # Category: Image Processing
 # Description: ImageMagick v7-based image manipulation and optimization utilities
-# Dependencies: imagemagick (v7+ with 'magick' command)
-# Functions: img-resize-width, img-resize-percentage, img-optimize, img-convert, img-optimize-to-webp, img-resize, img-thumbnail, img-resize-exact, img-resize-fill, img-adaptive-resize, img-batch-resize, img-resize-shrink-only, img-resize-colorspace
+# Dependencies: imagemagick (v7+ with 'magick' command) for img-* functions except img-rename
+# Functions: img-rename, img-resize-width, img-resize-percentage, img-optimize, img-convert, img-optimize-to-webp, img-resize, img-thumbnail, img-resize-exact, img-resize-fill, img-adaptive-resize, img-batch-resize, img-resize-shrink-only, img-resize-colorspace
+
+# Sanitize and rename image files by replacing spaces with underscores/hyphens
+# Also supports sequential renaming (e.g., image_1.jpg, image_2.jpg, ...)
+img-rename() {
+    local dry_run=false
+    local separator="_"
+    local target=""
+    local recursive=false
+    local sequential_name=""
+    local start_num=1
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit img-rename <file|directory> [options]
+Description: Sanitize image filenames by replacing spaces/special chars with underscores/hyphens
+          Or rename all images sequentially (e.g., image_1.jpg, image_2.jpg)
+Options:
+  -s, --sep <char>       Separator: '_' (default) or '-' (for sanitize mode)
+  -n, --dry-run          Show what would be renamed without making changes
+  -r, --recursive        Process directories recursively
+  --name <basename>      Sequential mode: rename to basename_1.ext, basename_2.ext
+  --start <number>       Starting number for sequential mode (default: 1)
+Examples:
+  kit img-rename "photo 1.jpg"              # Sanitize: photo_1.jpg
+  kit img-rename "VR (Quest/similar).jpg"   # Sanitize: VR_Quest_similar.jpg
+  kit img-rename "  my image.png "          # Sanitize: my_image.png (trims spaces)
+  kit img-rename . --sep "-"                # Sanitize all images in dir, use hyphens
+  kit img-rename . --name "photo"           # Sequential: photo_1.jpg, photo_2.png
+  kit img-rename . --name "img" --start 10  # Sequential: img_10.jpg, img_11.png
+  kit img-rename . --recursive              # Process subdirectories too
+  kit img-rename . --dry-run                # Preview changes without renaming
+Note: Sanitize mode replaces spaces and special chars (/, (, ), [, ], {, }, :, etc.)
+EOF
+                return 0
+                ;;
+            -s|--sep)
+                if [[ "$2" == "_" || "$2" == "-" ]]; then
+                    separator="$2"
+                else
+                    echo "Error: Separator must be '_' or '-'" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
+            -n|--dry-run)
+                dry_run=true
+                shift
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
+                ;;
+            --name)
+                sequential_name="$2"
+                shift 2
+                ;;
+            --start)
+                if [[ "$2" =~ ^[0-9]+$ ]]; then
+                    start_num="$2"
+                else
+                    echo "Error: Start number must be a positive integer" >&2
+                    return 2
+                fi
+                shift 2
+                ;;
+            *)
+                if [[ -z "$target" ]]; then
+                    target="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # Input validation
+    if [[ -z "$target" ]]; then
+        echo "Error: Missing target file or directory" >&2
+        return 2
+    fi
+
+    # Sequential mode only works with directories
+    if [[ -n "$sequential_name" && ! -d "$target" ]]; then
+        echo "Error: Sequential mode (--name) requires a directory target" >&2
+        return 2
+    fi
+
+    # Sanitize filename to prevent injection attacks
+    # Check for shell metacharacters that could be dangerous
+    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
+       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
+       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
+        echo "Error: Target contains invalid characters" >&2
+        return 2
+    fi
+
+    # Check for path traversal
+    if [[ "$target" == *"../"* ]] || [[ "$target" == *"/.."* ]]; then
+        echo "Error: Path contains traversal sequences" >&2
+        return 2
+    fi
+
+    # Validate sequential_name doesn't have invalid characters
+    if [[ -n "$sequential_name" ]]; then
+        if [[ "$sequential_name" == *"|"* ]] || [[ "$sequential_name" == *"&"* ]] || \
+           [[ "$sequential_name" == *'$'* ]] || [[ "$sequential_name" == *";"* ]] || \
+           [[ "$sequential_name" == *"<"* ]] || [[ "$sequential_name" == *">"* ]] || \
+           [[ "$sequential_name" == *"/"* ]] || [[ "$sequential_name" == *"\\"* ]]; then
+            echo "Error: Base name contains invalid characters" >&2
+            return 2
+        fi
+        # Also check for path traversal in base name
+        if [[ "$sequential_name" == *".."* ]]; then
+            echo "Error: Base name cannot contain '..'" >&2
+            return 2
+        fi
+    fi
+
+    # Supported image extensions
+    local -a extensions=(jpg jpeg png gif webp bmp tiff tif heic heif avif svg ico)
+    local -a extensions_upper=(JPG JPEG PNG GIF WEBP BMP TIFF TIF HEIC HEIF AVIF SVG ICO)
+
+    # Function to generate new filename
+    _generate_new_name() {
+        local old_name="$1"
+        local dirname="${old_name%/*}"
+        local basename="${old_name##*/}"
+        local filename="${basename%.*}"
+        local extension="${basename##*.}"
+        extension="${extension% }"
+        extension="${extension# }"
+
+        # Check if it's an image file (by extension)
+        local is_image=false
+        for ext in "${extensions[@]}" "${extensions_upper[@]}"; do
+            if [[ "${extension:l}" == "${ext:l}" ]]; then
+                is_image=true
+                break
+            fi
+        done
+
+        if [[ "$is_image" == false ]]; then
+            echo ""
+            return
+        fi
+
+        # Trim leading and trailing spaces
+        local trimmed="${filename## }"      # Remove leading spaces
+        trimmed="${trimmed%% }"              # Remove trailing spaces
+
+        # Replace problematic special characters with separator
+        # These cause issues in shells or filesystems
+        trimmed="${trimmed//\(/$separator}"   # (
+        trimmed="${trimmed//\)/$separator}"   # )
+        trimmed="${trimmed//\[/$separator}"   # [
+        trimmed="${trimmed//\]/$separator}"   # ]
+        trimmed="${trimmed//\{/$separator}"   # {
+        trimmed="${trimmed//\}/$separator}"   # }
+        trimmed="${trimmed//\\/$separator}"   # backslash
+        trimmed="${trimmed//\//$separator}"   # forward slash (dangerous!)
+        trimmed="${trimmed//:/$separator}"    # : (problematic on macOS/Windows)
+        trimmed="${trimmed//;/$separator}"    # ;
+        trimmed="${trimmed//,/$separator}"    # comma (optional)
+        trimmed="${trimmed//+/$separator}"    # +
+        trimmed="${trimmed//=/$separator}"    # =
+        trimmed="${trimmed//@/$separator}"    # @
+        trimmed="${trimmed//#/$separator}"    # #
+        trimmed="${trimmed//%/$separator}"    # %
+        trimmed="${trimmed//^/$separator}"    # ^
+        trimmed="${trimmed//~/$separator}"    # ~
+        trimmed="${trimmed//\!/$separator}"   # !
+        trimmed="${trimmed//\'/$separator}"   # '
+        trimmed="${trimmed//\"/$separator}"   # "
+        trimmed="${trimmed//\`/$separator}"   # backtick
+        trimmed="${trimmed//|/$separator}"    # |
+        trimmed="${trimmed//&/$separator}"    # &
+        trimmed="${trimmed//\$/$separator}"   # $
+        trimmed="${trimmed//\*/$separator}"   # *
+        trimmed="${trimmed//\?/$separator}"   # ? (escaped for zsh/bash glob)
+        trimmed="${trimmed//</$separator}"    # <
+        trimmed="${trimmed//>/$separator}"    # >
+
+        # Replace spaces with separator (after other chars to handle properly)
+        local new_name="${trimmed// /$separator}"
+
+        # Replace multiple consecutive separators with single one
+        while [[ "$new_name" == *"${separator}${separator}"* ]]; do
+            new_name="${new_name//${separator}${separator}/$separator}"
+        done
+
+        # Remove separator from start/end if present
+        new_name="${new_name#${separator}}"
+        new_name="${new_name%${separator}}"
+
+        # If nothing changed, return empty
+        if [[ "$new_name" == "$filename" ]]; then
+            echo ""
+            return
+        fi
+
+        # Construct full new path
+        if [[ "$dirname" == "$basename" ]]; then
+            echo "${new_name}.${extension}"
+        else
+            echo "${dirname}/${new_name}.${extension}"
+        fi
+    }
+
+    # Process single file
+    if [[ -f "$target" ]]; then
+        local new_name
+        new_name="$(_generate_new_name "$target")"
+
+        if [[ -z "$new_name" ]]; then
+            if [[ "$target" != *" "* ]]; then
+                echo "No changes needed: $target (already sanitized)"
+            else
+                echo "Skipped: $target (not an image file)"
+            fi
+            return 0
+        fi
+
+        # Check if target already exists
+        if [[ -e "$new_name" ]]; then
+            echo "Error: Cannot rename '$target' to '$new_name' - target already exists" >&2
+            return 1
+        fi
+
+        if [[ "$dry_run" == true ]]; then
+            echo "Would rename: $target -> $new_name"
+        else
+            if mv "$target" "$new_name"; then
+                echo "Renamed: $target -> $new_name"
+            else
+                echo "Error: Failed to rename '$target'" >&2
+                return 1
+            fi
+        fi
+        return 0
+    fi
+
+    # Process directory
+    if [[ -d "$target" ]]; then
+        # Sequential mode: rename all images to basename_N.ext
+        if [[ -n "$sequential_name" ]]; then
+            local count=0
+            local failed=0
+            local counter=$start_num
+
+            # Build find command based on recursive flag
+            local find_pattern="$target/*"
+            if [[ "$recursive" == true ]]; then
+                find_pattern="$target/**/*"
+            fi
+
+            # Use setopt for nullglob in zsh
+            setopt local_options nullglob 2>/dev/null || true
+
+            # Collect and sort files for consistent ordering
+            local -a files=()
+            for file in $~find_pattern; do
+                [[ -f "$file" ]] || continue
+
+                # Check if it's an image file
+                local ext="${file##*.}"
+                local is_image=false
+                for e in "${extensions[@]}" "${extensions_upper[@]}"; do
+                    if [[ "${ext:l}" == "${e:l}" ]]; then
+                        is_image=true
+                        break
+                    fi
+                done
+
+                [[ "$is_image" == true ]] && files+=("$file")
+            done
+
+            # Sort files for consistent ordering
+            files=("${(@o)files}")
+
+            for file in "${files[@]}"; do
+                local ext="${file##*.}"
+                local new_name="${target}/${sequential_name}_${counter}.${ext}"
+
+                # Check if target already exists
+                if [[ -e "$new_name" && "$new_name" != "$file" ]]; then
+                    echo "Warning: '$file' -> '$new_name' - target exists, skipping" >&2
+                    ((failed++))
+                    ((counter++))
+                    continue
+                fi
+
+                # Skip if no change needed
+                if [[ "$new_name" == "$file" ]]; then
+                    ((counter++))
+                    continue
+                fi
+
+                if [[ "$dry_run" == true ]]; then
+                    echo "Would rename: $file -> $new_name"
+                    ((count++))
+                else
+                    if mv "$file" "$new_name"; then
+                        echo "Renamed: $file -> $new_name"
+                        ((count++))
+                    else
+                        echo "Error: Failed to rename '$file'" >&2
+                        ((failed++))
+                    fi
+                fi
+                ((counter++))
+            done
+
+            echo ""
+            if [[ "$dry_run" == true ]]; then
+                echo "Would rename $count file(s)"
+            else
+                echo "Renamed $count file(s) to ${sequential_name}_N format"
+            fi
+            if [[ $failed -gt 0 ]]; then
+                echo "Failed: $failed file(s)" >&2
+                return 1
+            fi
+            return 0
+        fi
+
+        # Sanitize mode (default)
+        local count=0
+        local skipped=0
+        local failed=0
+
+        # Build find command based on recursive flag
+        local find_pattern="$target/*"
+        if [[ "$recursive" == true ]]; then
+            find_pattern="$target/**/*"
+        fi
+
+        # Use setopt for nullglob in zsh
+        setopt local_options nullglob 2>/dev/null || true
+
+        for file in $~find_pattern; do
+            [[ -f "$file" ]] || continue
+
+            local new_name
+            new_name="$(_generate_new_name "$file")"
+
+            if [[ -z "$new_name" ]]; then
+                ((skipped++))
+                continue
+            fi
+
+            # Check if target already exists
+            if [[ -e "$new_name" ]]; then
+                echo "Warning: '$file' -> '$new_name' - target exists, skipping" >&2
+                ((failed++))
+                continue
+            fi
+
+            if [[ "$dry_run" == true ]]; then
+                echo "Would rename: $file -> $new_name"
+                ((count++))
+            else
+                if mv "$file" "$new_name"; then
+                    echo "Renamed: $file -> $new_name"
+                    ((count++))
+                else
+                    echo "Error: Failed to rename '$file'" >&2
+                    ((failed++))
+                fi
+            fi
+        done
+
+        echo ""
+        if [[ "$dry_run" == true ]]; then
+            echo "Would rename $count file(s)"
+        else
+            echo "Renamed $count file(s)"
+        fi
+        if [[ $skipped -gt 0 ]]; then
+            echo "Skipped $skipped file(s) (no changes needed or not images)"
+        fi
+        if [[ $failed -gt 0 ]]; then
+            echo "Failed: $failed file(s)" >&2
+            return 1
+        fi
+        return 0
+    fi
+
+    # Target doesn't exist
+    echo "Error: Target '$target' does not exist" >&2
+    return 1
+}
 
 # Helper function to print ImageMagick installation instructions
 # Usage: _kit_imagemagick_install_help <mode>
@@ -52,12 +445,12 @@ _kit_imagemagick_install_help() {
 # Helper function to check ImageMagick v7 availability
 _kit_require_imagemagick() {
     # Check for v7 (magick command)
-    if command -v magick &> /dev/null; then
+    if command -v magick > /dev/null 2>&1; then
         return 0
     fi
 
     # Check for v6 (convert command) and provide migration help
-    if command -v convert &> /dev/null; then
+    if command -v convert > /dev/null 2>&1; then
         echo "Error: ImageMagick v6 detected. Kit requires ImageMagick v7+." >&2
         echo "" >&2
         echo "You have ImageMagick v6 (uses 'convert' command)." >&2
@@ -126,7 +519,9 @@ EOF
 
     # Sanitize filename to prevent injection attacks
     # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
-    if [[ "$input" =~ [|&\$';<>] ]]; then
+    if [[ "$input" == *"|"* ]] || [[ "$input" == *"&"* ]] || \
+       [[ "$input" == *'$'* ]] || [[ "$input" == *";"* ]] || \
+       [[ "$input" == *"<"* ]] || [[ "$input" == *">"* ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
@@ -186,8 +581,9 @@ EOF
     fi
 
     # Sanitize filename to prevent injection attacks
-    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
-    if [[ "$2" =~ [|&\$';<>] ]]; then
+    if [[ "$2" == *"|"* ]] || [[ "$2" == *"&"* ]] || \
+       [[ "$2" == *'$'* ]] || [[ "$2" == *";"* ]] || \
+       [[ "$2" == *"<"* ]] || [[ "$2" == *">"* ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
@@ -268,7 +664,9 @@ EOF
 
     # Sanitize filename to prevent injection attacks
     # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
-    if [[ "$input" =~ [|&\$';<>] ]]; then
+    if [[ "$input" == *"|"* ]] || [[ "$input" == *"&"* ]] || \
+       [[ "$input" == *'$'* ]] || [[ "$input" == *";"* ]] || \
+       [[ "$input" == *"<"* ]] || [[ "$input" == *">"* ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
@@ -334,7 +732,7 @@ EOF
 
     # Find all matching files (case-insensitive)
     local input_files=()
-    for ext in "$from_format" "${from_format^^}" "${from_format,,}"; do
+    for ext in "$from_format" "${from_format:u}" "${from_format:l}"; do
         for file in *.$ext; do
             [[ -f "$file" ]] && input_files+=("$file")
         done
