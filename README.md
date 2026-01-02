@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.4
+# Kit's Toolkit v2.4.1
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -205,6 +205,11 @@ nvim|nvim|Neovim
 Create your `editor.conf` from the example:
 ```bash
 cp editor.conf.example editor.conf
+```
+
+**Note:** After creating `editor.conf`, reload your shell to see editors in `kit -h`:
+```bash
+source ~/.zshrc
 ```
 
 Disable auto-generation of editor shortcuts:
@@ -743,9 +748,14 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.4.1** — Dynamic tab completion system
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.4.1** (2026-01-02)
+  - ⚡ Fully dynamic auto-discovering tab completion system
+  - 🔧 No manual regeneration needed - completions discover functions, editors, and shortcuts automatically
+  - 📝 Updated documentation for dynamic completion behavior
 - **v2.4.0** (2026-01-02)
   - ✏️ Added configurable editor shortcuts via `editor.conf`
   - ✏️ Auto-generates editor functions (code, zed, cursor, nvim, etc.)
