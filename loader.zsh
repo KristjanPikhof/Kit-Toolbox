@@ -149,7 +149,7 @@ kit() {
 
         echo ""
         echo "${BOLD}╭─────────────────────────────────────────────────────────────────╮${NC}"
-        echo "${BOLD}│${NC}  ${BLUE}🛠️  Kit - Shell Toolkit${NC}                          ${DIM}v2.0.1${NC}  ${BOLD}│${NC}"
+        echo "${BOLD}│${NC}  ${BLUE}🛠️  Kit - Shell Toolkit${NC}                          ${DIM}v2.3.0${NC}  ${BOLD}│${NC}"
         echo "${BOLD}╰─────────────────────────────────────────────────────────────────╯${NC}"
         echo ""
 
