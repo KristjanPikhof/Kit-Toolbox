@@ -82,6 +82,79 @@ _kit_generate_shortcuts() {
 _kit_generate_shortcuts
 
 # ============================================================================
+# AUTO-GENERATE EDITOR SHORTCUTS
+# ============================================================================
+
+KIT_EDITOR_ALIASES=()
+_kit_generate_editors() {
+    local editors_file="$KIT_EXT_DIR/editor.conf"
+    local auto_generate="${KIT_AUTO_EDITORS:-true}"
+
+    [[ "$auto_generate" != "true" ]] && return 0
+    [[ ! -f "$editors_file" ]] && return 0
+
+    local conflicts=0
+    local duplicates=()
+
+    while IFS='|' read -r name editor_cmd desc; do
+        [[ "$name" =~ ^# ]] && continue
+        [[ -z "$name" ]] && continue
+
+        if [[ " ${KIT_EDITOR_ALIASES[*]} " == *" $name "* ]]; then
+            echo "❌ Error: Duplicate editor '$name' in editor.conf" >&2
+            duplicates+=("$name")
+            conflicts=$((conflicts + 1))
+            continue
+        fi
+
+        if declare -f "$name" > /dev/null 2>&1; then
+            echo "⚠️  Warning: Editor shortcut '$name' conflicts with existing function - prefer editor behavior" >&2
+        fi
+
+        # Escape single quotes in command
+        local escaped_cmd="${editor_cmd//\'/\'\\\'\'}"
+
+        # Generate function that opens files/folders with the editor
+        eval "$name() {
+            if [[ \"\$1\" == \"-h\" || \"\$1\" == \"--help\" ]]; then
+                echo \"Usage: kit $name <file|folder>\"
+                echo \"Description: Open file or folder with $desc\"
+                echo \"\"
+                echo \"Examples:\"
+                echo \"  kit $name myfile.md\"
+                echo \"  kit $name .\"
+                return 0
+            fi
+
+            if [[ -z \"\$1\" ]]; then
+                echo \"Error: Missing file or folder path\" >&2
+                echo \"Usage: kit $name <file|folder>\" >&2
+                return 2
+            fi
+
+            local target=\"\$1\"
+
+            # Check if target exists (skip for current directory)
+            if [[ ! -e \"\$target\" && \"\$target\" != \".\" ]]; then
+                echo \"Error: '\$target' does not exist\" >&2
+                return 1
+            fi
+
+            # Open with the editor
+            $escaped_cmd \"\$target\"
+        }"
+
+        KIT_EDITOR_ALIASES+=("$name")
+    done < "$editors_file"
+
+    if [[ $conflicts -gt 0 ]]; then
+        echo "❌ Found $conflicts editor conflict(s). Please fix editor.conf" >&2
+    fi
+}
+
+_kit_generate_editors
+
+# ============================================================================
 # LOAD ZSH COMPLETIONS
 # ============================================================================
 
@@ -232,6 +305,17 @@ kit() {
             echo ""
         fi
 
+        if [[ ${#KIT_EDITOR_ALIASES[@]} -gt 0 ]]; then
+            echo "${CYAN}✏️  Editor Shortcuts${NC}"
+            echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
+            local editors_file="$KIT_EXT_DIR/editor.conf"
+            for editor_name in "${KIT_EDITOR_ALIASES[@]}"; do
+                local desc=$(awk -F'|' -v name="$editor_name" '!/^#/ && NF > 0 && $1 == name {print $3; exit}' "$editors_file" 2>/dev/null || echo "")
+                printf "  ${GREEN}%-22s${NC} ${DIM}%s${NC}\n" "$editor_name" "$desc"
+            done
+            echo ""
+        fi
+
         echo "${CYAN}💡 Getting Started${NC}"
         echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
         echo "  ${YELLOW}kit ${GREEN}<command>${NC} [args]     Run a function"
@@ -242,7 +326,7 @@ kit() {
 
         # Footer with stats
         echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
-        echo "  ${DIM}${total_functions} functions across ${total_categories} categories • ${#KIT_NAV_ALIASES[@]} shortcuts${NC}"
+        echo "  ${DIM}${total_functions} functions across ${total_categories} categories • ${#KIT_NAV_ALIASES[@]} shortcuts • ${#KIT_EDITOR_ALIASES[@]} editors${NC}"
         echo ""
 
         return 0
