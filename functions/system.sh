@@ -480,8 +480,7 @@ EOF
 
     # Get remote version
     local remote_version="unknown"
-    git show origin/${current_branch}:VERSION 2>/dev/null > /dev/null && \
-        remote_version="$(git show origin/${current_branch}:VERSION 2>/dev/null | tr -d '[:space:]')"
+    remote_version="$(git show origin/${current_branch}:VERSION 2>/dev/null | tr -d '[:space:]')" && [[ -n "$remote_version" ]] || remote_version="unknown"
 
     echo "Update available: ${remote_version}"
     echo ""
