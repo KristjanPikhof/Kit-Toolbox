@@ -284,8 +284,9 @@ EOF
         purge_dir=true
     fi
 
-    # Pattern to identify Kit configuration block (supports V2, V3, etc.)
-    local kit_marker_pattern='# Kit V[0-9]'
+    # Pattern to identify Kit configuration block (version-agnostic)
+    # Matches: "# Kit X.Y.Z - Shell Toolkit"
+    local kit_marker_pattern='# Kit .* - Shell Toolkit'
 
     # Check if KIT_EXT_DIR is set
     if [[ -z "$KIT_EXT_DIR" ]]; then
@@ -294,7 +295,7 @@ EOF
         echo "      KIT_EXT_DIR may not be set in this session." >&2
         echo "" >&2
         echo "You can still uninstall manually by removing the Kit configuration block" >&2
-        echo "from your ~/.zshrc file (look for lines starting with '# Kit V[0-9]')." >&2
+        echo "from your ~/.zshrc file (look for '# Kit X.Y.Z - Shell Toolkit')." >&2
         return 1
     fi
 
@@ -341,7 +342,7 @@ EOF
         done
         echo "" >&2
         echo "It may have already been removed, or Kit was configured in a custom location." >&2
-        echo "Please check your zsh configuration manually for the '# Kit V[0-9]' marker." >&2
+        echo "Please check your zsh configuration manually for the '# Kit X.Y.Z - Shell Toolkit' marker." >&2
         return 1
     fi
 
@@ -360,6 +361,7 @@ EOF
 
     # Remove lines between the Kit marker and the line that sources loader.zsh
     # Using awk for cross-platform compatibility (macOS/BSD and Linux/GNU)
+    # Pattern matches version-agnostic marker: "# Kit X.Y.Z - Shell Toolkit"
     # Pattern handles various quoting styles:
     #   source "$KIT_EXT_DIR/loader.zsh"
     #   source $KIT_EXT_DIR/loader.zsh
@@ -377,7 +379,7 @@ EOF
         echo "Successfully removed Kit configuration from $active_config"
     else
         echo "Warning: Some Kit configuration may remain in $active_config" >&2
-        echo "Please check manually for the '# Kit V[0-9]' marker and source lines" >&2
+        echo "Please check manually for the '# Kit X.Y.Z - Shell Toolkit' marker and source lines" >&2
     fi
 
     # Ask about removing kit directory (or do it if --purge was used)
