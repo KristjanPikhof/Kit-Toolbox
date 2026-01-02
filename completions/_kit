@@ -119,7 +119,7 @@ _kit_is_shortcut() {
 # Get custom completion options for specific commands
 _kit_get_custom_completion() {
     local cmd="$1"
-    local pos="$2"  # Current argument position
+    local pos="$2"  # Current argument position (zsh $CURRENT is 1-based: 2=first cmd arg, 3=second, etc.)
 
     case "$cmd" in
         yt-download)

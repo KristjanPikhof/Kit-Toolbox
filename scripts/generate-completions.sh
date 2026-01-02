@@ -56,13 +56,13 @@ if [[ -f "$COMPLETION_FILE" ]]; then
 
         # Count shortcuts (filter empty lines properly)
         if [[ -f "$EXT_DIR/shortcuts.conf" ]]; then
-            local shortcuts=$(grep -v '^#' "$EXT_DIR/shortcuts.conf" | grep -v '^$' | grep -c '.' || echo "0")
+            local shortcuts=$(grep -v '^#' "$EXT_DIR/shortcuts.conf" 2>/dev/null | grep -v '^$' | grep -c '.' 2>/dev/null || echo "0")
             echo "   Navigation shortcuts: $shortcuts"
         fi
 
         # Count editors (filter empty lines properly)
         if [[ -f "$EXT_DIR/editor.conf" ]]; then
-            local editors=$(grep -v '^#' "$EXT_DIR/editor.conf" | grep -v '^$' | grep -c '.' || echo "0")
+            local editors=$(grep -v '^#' "$EXT_DIR/editor.conf" 2>/dev/null | grep -v '^$' | grep -c '.' 2>/dev/null || echo "0")
             echo "   Editor shortcuts: $editors"
         fi
 
