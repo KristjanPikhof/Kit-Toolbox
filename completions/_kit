@@ -67,29 +67,59 @@ case "$CURRENT" in
         # Complete arguments based on the command
         local cmd="${words[2]}"
         case "$cmd" in
-            # Commands that take file arguments
-            resize-img|upscale-img|optimize-img|convert-heic|zed)
+            # Image processing functions - take file arguments
+            img-resize-width|img-resize-percentage|img-optimize|img-resize|img-thumbnail|img-resize-exact|img-resize-fill|img-adaptive-resize|img-resize-shrink-only|img-resize-colorspace|img-batch-resize)
                 _files
                 ;;
-            convert-bulk)
-                # First arg is extension, then output format
+            # Image format conversion - first arg is format, second is format
+            img-convert)
                 if [[ $CURRENT -eq 3 ]]; then
-                    _files -g '*.*' 'input file'
-                else
-                    _message 'output format'
+                    _values 'from format' png jpg jpeg webp heic avif bmp tiff gif pdf
+                elif [[ $CURRENT -eq 4 ]]; then
+                    _values 'to format' png jpg jpeg webp heic avif bmp tiff gif pdf
                 fi
                 ;;
+            # WebP optimization - no arguments needed
+            img-optimize-to-webp)
+                _message 'converts all images in current directory'
+                ;;
+            # YouTube download - mode and URL
             yt-download)
                 if [[ $CURRENT -eq 3 ]]; then
-                    _values 'mode' 'mp3' 'mp4'
+                    _values 'mode' mp3 mp4
                 elif [[ $CURRENT -eq 4 ]]; then
-                    _message 'URL'
+                    _message 'YouTube URL'
                 fi
                 ;;
-            goto|mklink|list-files|list-all|list-reverse|list-all-reverse|list-tree|removeaudio|convert-to-mp3)
+            # Media processing - take file arguments
+            remove-audio|convert-to-mp3|compress-video)
                 _files
                 ;;
+            # System utilities
+            zed)
+                _files
+                ;;
+            mklink)
+                if [[ $CURRENT -eq 3 ]]; then
+                    _files
+                elif [[ $CURRENT -eq 4 ]]; then
+                    _message 'link name'
+                fi
+                ;;
+            # Navigation
+            goto)
+                _message 'shortcut name'
+                ;;
+            # File listing functions
+            list-files|list-all|list-reverse|list-all-reverse|list-tree|ls|la|lsr|lar|lt)
+                _files
+                ;;
+            # Environment helpers
+            ccflare-on|ccflare-off)
+                _message 'no arguments needed'
+                ;;
             *)
+                # Default to file completion for unknown commands
                 _files
                 ;;
         esac

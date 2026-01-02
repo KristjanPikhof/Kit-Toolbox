@@ -4,6 +4,31 @@
 # Dependencies: none
 # Functions: ccflare-on, ccflare-off
 
+# Cross-platform realpath implementation
+# Handles both macOS (no realpath) and Linux
+_kit_realpath() {
+    local path="$1"
+
+    # If GNU realpath is available, use it
+    if command -v realpath &> /dev/null; then
+        realpath "$path" 2>/dev/null && return 0
+    fi
+
+    # Fallback for macOS: use Perl
+    if command -v perl &> /dev/null; then
+        perl -MCwd -e 'print Cwd::realpath($ARGV[0])' "$path" 2>/dev/null && return 0
+    fi
+
+    # Last resort: use zsh's built-in path resolution (requires path to exist)
+    if [[ -e "$path" ]]; then
+        echo "${path:A}"
+        return 0
+    fi
+
+    # Path doesn't exist, return as-is
+    echo "$path"
+}
+
 # Navigate to a named directory shortcut (DEPRECATED - use shortcuts directly)
 goto() {
     echo "⚠️  Warning: 'goto' is deprecated. Use shortcuts directly: kit <shortcut_name>" >&2
@@ -47,7 +72,7 @@ EOF
 
     target_path="${target_path/\~/$HOME}"
     local realpath_path
-    realpath_path=$(realpath "$target_path" 2>/dev/null || echo "$target_path")
+    realpath_path=$(_kit_realpath "$target_path")
 
     if [[ "$realpath_path" != "$HOME"* && "$realpath_path" != /tmp/* && "$realpath_path" != /var/folders/* ]]; then
         echo "Error: Path outside allowed directories" >&2
