@@ -48,8 +48,9 @@ zsh install.sh
 The installer will:
 - ✓ Backup your existing `.zshrc`
 - ✓ Add Kit configuration to your shell
+- ✓ Detect your OS and package manager (macOS/Linux with brew, apt, dnf, pacman, etc.)
 - ✓ Check for optional dependencies (ImageMagick, yt-dlp, ffmpeg, lsd)
-- ✓ Offer to install missing dependencies via Homebrew
+- ✓ Offer to install missing dependencies automatically
 - ✓ Verify the installation
 
 #### Manual Installation
@@ -113,8 +114,13 @@ Download and process video/audio:
 ### 🖇️ System Utilities
 Shell and filesystem tools:
 - **mklink** — Create symbolic links with validation
-- **zed** — Open files in Zed editor
+- **zed** — Open files in Zed editor (cross-platform)
 - **killports** — Kill processes using specified network ports
+
+### 📦 Dependencies
+Cross-platform dependency management:
+- **deps-check** — Check status of all toolkit dependencies
+- **deps-install** — Install missing dependencies for your platform (supports macOS/Linux with brew, apt, dnf, pacman, yum, zypper)
 
 ### 🧭 Navigation Shortcuts
 Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
@@ -124,7 +130,7 @@ Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
 **Auto-generated navigation shortcuts** (configured in `shortcuts.conf`):
 ```bash
 kit dev        # Navigate to ~/Desktop/Development
-kit claude     # Navigate to ~/.claude/
+kit claudedir  # Navigate to ~/.claude/
 kit kit        # Navigate to kit-toolkit directory
 # ... and more, see `kit -h` for full list
 ```
@@ -459,15 +465,43 @@ myalias|/some/path|My project directory
 
 ## Dependencies
 
-Each category has different dependencies:
+### Managing Dependencies
+
+Kit provides built-in commands to manage dependencies across platforms:
+
+```bash
+# Check what's installed and what's missing
+kit deps-check
+
+# Install all missing dependencies (auto-detects your package manager)
+kit deps-install
+
+# Preview what would be installed (dry run)
+kit deps-install --dry-run
+
+# Auto-confirm all prompts (for scripts)
+kit deps-install --yes
+```
+
+### Supported Platforms
+
+The toolkit supports **macOS** and **Linux** with the following package managers:
+
+| OS | Package Managers |
+|----|-----------------|
+| macOS | Homebrew (`brew`) |
+| Linux | apt (Debian/Ubuntu), dnf (Fedora), yum (RHEL/CentOS), pacman (Arch), zypper (openSUSE) |
+
+### Required Dependencies by Category
 
 | Category | Dependencies |
 |----------|---|
 | images | **ImageMagick v7+** (with `magick` command) |
 | media | `yt-dlp`, `ffmpeg` |
-| system | none |
+| system | `lsof` (for killports) |
 | aliases | none |
 | lsd | `lsd` |
+| deps | none |
 
 ### Installing ImageMagick v7
 
@@ -500,6 +534,15 @@ magick --version
 ```
 
 ### Installing Other Dependencies
+
+**The easiest way:**
+
+```bash
+# After installing Kit, use the built-in dependency installer
+kit deps-install
+```
+
+**Or install manually:**
 
 **macOS:**
 ```bash
@@ -549,9 +592,15 @@ Use freely. Modify as needed.
 
 ## Version
 
-**v2.1.0** — Cross-platform compatibility, ImageMagick v7
+**v2.2.0** — Cross-platform dependency management
 
 ### Changelog
+- **v2.2.0** (2026-01-02)
+  - 📦 Added `deps-install` command - cross-platform dependency installer
+  - 📦 Added `deps-check` command - check status of all dependencies
+  - 🌍 Auto-detects OS and package manager (brew, apt, dnf, yum, pacman, zypper)
+  - 📝 Updated README with dependency management section
+  - 🔧 Updated installer with cross-platform package manager detection
 - **v2.1.0** (2026-01-02)
   - 🌍 Added Linux/macOS cross-platform support
   - 🖼️ Image functions now require ImageMagick v7+ (`magick` command)

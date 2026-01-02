@@ -57,6 +57,9 @@ Navigation (directory shortcuts, environment management)
 File listing (enhanced ls, tree views)
   → Category: lsd.sh
 
+Dependency management (package installation, checking)
+  → Category: deps.sh
+
 None of the above with 3+ related functions
   → Create new category
 ```
@@ -438,8 +441,35 @@ EOF
 **Common cross-platform considerations:**
 - **File paths**: Use `$HOME` instead of `~` in scripts
 - **Commands**: `realpath` may not exist on macOS (use Perl or zsh fallback)
-- **Install instructions**: Provide platform-specific install commands
+- **Install instructions**: Use `_kit_get_package_install_cmd()` from deps.sh for consistent install messages
 - **Editor integration**: macOS uses `open -a AppName`, Linux uses direct command
+- **Package managers**: Support brew (macOS), apt, dnf, yum, pacman, zypper (Linux)
+
+**Cross-platform dependency helper functions** (available in deps.sh):
+```bash
+# Detect OS: returns "macos", "linux", or "unknown"
+_kit_detect_os
+
+# Detect package manager: returns "brew", "apt", "dnf", "yum", "pacman", "zypper", or "none"
+_kit_detect_package_manager
+
+# Get platform-specific install command for a package
+_kit_get_package_install_cmd <package_name>
+
+# Example usage in dependency check:
+if ! command -v required_tool &> /dev/null; then
+    echo "Error: required_tool not installed." >&2
+    local install_cmd
+    install_cmd=$(_kit_get_package_install_cmd "package_name")
+    # Check if output doesn't start with "Error"
+    if [[ "$install_cmd" != Error:* ]]; then
+        echo "Install with: $install_cmd" >&2
+    else
+        echo "$install_cmd" >&2
+    fi
+    return 1
+fi
+```
 
 ## Category Management
 
