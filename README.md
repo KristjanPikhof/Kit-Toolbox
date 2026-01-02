@@ -114,6 +114,7 @@ Download and process video/audio:
 Shell and filesystem tools:
 - **mklink** — Create symbolic links with validation
 - **zed** — Open files in Zed editor
+- **killports** — Kill processes using specified network ports
 
 ### 🧭 Navigation Shortcuts
 Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
@@ -558,6 +559,7 @@ Use freely. Modify as needed.
   - 🔧 Fixed `realpath` compatibility for macOS (uses Perl/zsh fallback)
   - 📝 Updated tab completion with correct function names
   - 📚 Updated documentation with Linux installation instructions
+  - 🔪 Added `killports()` function to kill processes by network port
 - **v2.0.1** (2025-12-29)
   - 🐛 Fixed PATH corruption bug caused by `path` variable name conflict
   - ✨ Added automated installation script (`install.sh`)
