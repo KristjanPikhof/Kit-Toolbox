@@ -140,7 +140,7 @@ for file in "$FUNCTIONS_DIR"/*.sh; do
 
                 # Determine what kind of arguments this function takes
                 case "$func" in
-                    resize-img|upscale-img|optimize-img|convert-heic|removeaudio|convert-to-mp3|zed)
+                    resize-img|upscale-img|optimize-img|convert-heic|removeaudio|convert-to-mp3)
                         echo "            $func)" >> "$OUTPUT_FILE"
                         echo "                _files" >> "$OUTPUT_FILE"
                         echo "                ;;" >> "$OUTPUT_FILE"

@@ -152,9 +152,6 @@ case "$CURRENT" in
             mklink)
                 _files
                 ;;
-            zed)
-                _files
-                ;;
             killports)
                 _files
                 ;;
