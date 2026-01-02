@@ -330,13 +330,22 @@ Verifies:
 - Error handling correct
 - Exit codes appropriate
 
-### Completion Generator
-Auto-generate tab completion:
+### Completion System Verifier
+Verify the dynamic completion system is working:
 ```bash
 ./scripts/generate-completions.sh
 ```
 
-Scans all functions and updates the completion script.
+**Note:** The completion system is FULLY DYNAMIC. No regeneration needed!
+It automatically discovers:
+- All functions from `functions/*.sh` (via `# Functions:` headers)
+- All editor shortcuts from `editor.conf`
+- All navigation shortcuts from `shortcuts.conf`
+
+Simply reload your shell after adding new functions:
+```bash
+source ~/.zshrc
+```
 
 ## Quick Reference
 

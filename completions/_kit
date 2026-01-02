@@ -1,9 +1,10 @@
 #compdef kit
-# Completion script for kit command (auto-generated)
-# Provides tab-completion for function names and arguments
+# Completion script for kit command (fully dynamic)
+# Provides tab-completion for function names, shortcuts, and arguments
 
-local -a commands
-local expl
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
 # Get all available functions from function files
 _kit_get_commands() {
@@ -31,28 +32,36 @@ _kit_get_editors() {
     done < "$editors_file"
 }
 
+# Get navigation shortcuts from shortcuts.conf
+_kit_get_shortcuts() {
+    local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
+    [[ -f "$shortcuts_file" ]] || return 0
+
+    while IFS='|' read -r name path desc; do
+        [[ "$name" =~ ^# ]] && continue
+        [[ -z "$name" ]] && continue
+        echo "$name"
+    done < "$shortcuts_file"
+}
+
 # Build command list with descriptions
 _kit_build_command_list() {
     local functions_dir="$KIT_EXT_DIR/functions"
     local -a commands_with_desc=()
 
+    # Add functions from category files
     for file in "$functions_dir"/*.sh; do
         if [[ -f "$file" ]]; then
             local functions=$(grep "^# Functions:" "$file" | cut -d: -f2- | xargs | tr ',' ' ')
             local category=$(grep "^# Category:" "$file" | cut -d: -f2- | xargs)
 
             for func in $functions; do
-                # Try to get short description from function help
-                local desc=$(declare -f "$func" 2>/dev/null | grep -o 'Usage:.*$' | head -1 | sed 's/Usage: kit [^ ]* *//' | sed 's/ *Example.*//' | cut -c1-50)
-                if [[ -z "$desc" ]]; then
-                    desc="$category"
-                fi
-                commands_with_desc+=("$func:$desc")
+                commands_with_desc+=("$func:$category")
             done
         fi
     done
 
-    # Add editor shortcuts
+    # Add editor shortcuts from editor.conf
     local editors_file="$KIT_EXT_DIR/editor.conf"
     if [[ -f "$editors_file" ]]; then
         while IFS='|' read -r name cmd desc; do
@@ -62,10 +71,84 @@ _kit_build_command_list() {
         done < "$editors_file"
     fi
 
+    # Add navigation shortcuts from shortcuts.conf
+    local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
+    if [[ -f "$shortcuts_file" ]]; then
+        while IFS='|' read -r name path desc; do
+            [[ "$name" =~ ^# ]] && continue
+            [[ -z "$name" ]] && continue
+            commands_with_desc+=("$name:$desc")
+        done < "$shortcuts_file"
+    fi
+
     printf '%s\n' "$commands_with_desc[@]"
 }
 
-# Main completion logic
+# Check if a command is an editor shortcut
+_kit_is_editor() {
+    local cmd="$1"
+    local editors_file="$KIT_EXT_DIR/editor.conf"
+    [[ -f "$editors_file" ]] || return 1
+
+    while IFS='|' read -r name editor_cmd desc; do
+        [[ "$name" =~ ^# ]] && continue
+        [[ -z "$name" ]] && continue
+        if [[ "$name" == "$cmd" ]]; then
+            return 0
+        fi
+    done < "$editors_file"
+    return 1
+}
+
+# Check if a command is a navigation shortcut
+_kit_is_shortcut() {
+    local cmd="$1"
+    local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
+    [[ -f "$shortcuts_file" ]] || return 1
+
+    while IFS='|' read -r name path desc; do
+        [[ "$name" =~ ^# ]] && continue
+        [[ -z "$name" ]] && continue
+        if [[ "$name" == "$cmd" ]]; then
+            return 0
+        fi
+    done < "$shortcuts_file"
+    return 1
+}
+
+# Get custom completion options for specific commands
+_kit_get_custom_completion() {
+    local cmd="$1"
+    local pos="$2"  # Current argument position
+
+    case "$cmd" in
+        yt-download)
+            if [[ $pos -eq 3 ]]; then
+                _values 'format' 'mp3' 'mp4'
+                return 0
+            fi
+            ;;
+        uninstall)
+            if [[ $pos -eq 3 ]]; then
+                _values 'options' '--purge'
+                return 0
+            fi
+            ;;
+        update)
+            if [[ $pos -eq 3 ]]; then
+                _values 'options' '--check-only'
+                return 0
+            fi
+            ;;
+    esac
+
+    return 1
+}
+
+# ============================================================================
+# MAIN COMPLETION LOGIC
+# ============================================================================
+
 case "$CURRENT" in
     2)
         # Complete the command name (first argument after 'kit')
@@ -88,130 +171,19 @@ case "$CURRENT" in
     *)
         # Complete arguments based on the command
         local cmd="${words[2]}"
-        # Check if cmd is an editor shortcut
-        local is_editor=0
-        local editors_file="$KIT_EXT_DIR/editor.conf"
-        if [[ -f "$editors_file" ]]; then
-            while IFS='|' read -r name editor_cmd desc; do
-                [[ "$name" =~ ^# ]] && continue
-                [[ -z "$name" ]] && continue
-                if [[ "$name" == "$cmd" ]]; then
-                    is_editor=1
-                    break
-                fi
-            done < "$editors_file"
+
+        # Try custom completion first
+        if _kit_get_custom_completion "$cmd" "$CURRENT"; then
+            return 0
         fi
 
-        if [[ $is_editor -eq 1 ]]; then
+        # Check if cmd is an editor or navigation shortcut - these take file/folder args
+        if _kit_is_editor "$cmd" || _kit_is_shortcut "$cmd"; then
             _files
-        else
-            case "$cmd" in
-            ccflare-on)
-                _files
-                ;;
-            ccflare-off)
-                _files
-                ;;
-            deps-install)
-                _files
-                ;;
-            deps-check)
-                _files
-                ;;
-            img-resize-width)
-                _files
-                ;;
-            img-resize-percentage)
-                _files
-                ;;
-            img-optimize)
-                _files
-                ;;
-            img-convert)
-                _files
-                ;;
-            img-optimize-to-webp)
-                _files
-                ;;
-            img-resize)
-                _files
-                ;;
-            img-thumbnail)
-                _files
-                ;;
-            img-resize-exact)
-                _files
-                ;;
-            img-resize-fill)
-                _files
-                ;;
-            img-adaptive-resize)
-                _files
-                ;;
-            img-batch-resize)
-                _files
-                ;;
-            img-resize-shrink-only)
-                _files
-                ;;
-            img-resize-colorspace)
-                _files
-                ;;
-            list-files)
-                _files
-                ;;
-            list-all)
-                _files
-                ;;
-            list-reverse)
-                _files
-                ;;
-            list-all-reverse)
-                _files
-                ;;
-            list-tree)
-                _files
-                ;;
-            yt-download)
-                if [[ $CURRENT -eq 3 ]]; then
-                    _values 'mode' 'mp3' 'mp4'
-                elif [[ $CURRENT -eq 4 ]]; then
-                    _message 'URL'
-                fi
-                ;;
-            remove-audio)
-                _files
-                ;;
-            convert-to-mp3)
-                _files
-                ;;
-            compress-video)
-                _files
-                ;;
-            mklink)
-                _files
-                ;;
-            killports)
-                _files
-                ;;
-            uninstall)
-                if [[ $CURRENT -eq 3 ]]; then
-                    _values 'uninstall options' '--purge'
-                else
-                    _files
-                fi
-                ;;
-            update)
-                if [[ $CURRENT -eq 3 ]]; then
-                    _values 'update options' '--check-only'
-                else
-                    _files
-                fi
-                ;;
-            *)
-                _files
-                ;;
-        esac
+            return 0
         fi
+
+        # Default: files and folders for all other commands
+        _files
         ;;
 esac
