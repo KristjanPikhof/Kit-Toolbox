@@ -1,5 +1,5 @@
 #compdef kit
-# Completion script for kit command
+# Completion script for kit command (auto-generated)
 # Provides tab-completion for function names and arguments
 
 local -a commands
@@ -67,59 +67,98 @@ case "$CURRENT" in
         # Complete arguments based on the command
         local cmd="${words[2]}"
         case "$cmd" in
-            # Image processing functions - take file arguments
-            img-resize-width|img-resize-percentage|img-optimize|img-resize|img-thumbnail|img-resize-exact|img-resize-fill|img-adaptive-resize|img-resize-shrink-only|img-resize-colorspace|img-batch-resize)
+            ccflare-on)
                 _files
                 ;;
-            # Image format conversion - first arg is format, second is format
+            ccflare-off)
+                _files
+                ;;
+            deps-install)
+                _files
+                ;;
+            deps-check)
+                _files
+                ;;
+            img-resize-width)
+                _files
+                ;;
+            img-resize-percentage)
+                _files
+                ;;
+            img-optimize)
+                _files
+                ;;
             img-convert)
-                if [[ $CURRENT -eq 3 ]]; then
-                    _values 'from format' png jpg jpeg webp heic avif bmp tiff gif pdf
-                elif [[ $CURRENT -eq 4 ]]; then
-                    _values 'to format' png jpg jpeg webp heic avif bmp tiff gif pdf
-                fi
+                _files
                 ;;
-            # WebP optimization - no arguments needed
             img-optimize-to-webp)
-                _message 'converts all images in current directory'
+                _files
                 ;;
-            # YouTube download - mode and URL
+            img-resize)
+                _files
+                ;;
+            img-thumbnail)
+                _files
+                ;;
+            img-resize-exact)
+                _files
+                ;;
+            img-resize-fill)
+                _files
+                ;;
+            img-adaptive-resize)
+                _files
+                ;;
+            img-batch-resize)
+                _files
+                ;;
+            img-resize-shrink-only)
+                _files
+                ;;
+            img-resize-colorspace)
+                _files
+                ;;
+            list-files)
+                _files
+                ;;
+            list-all)
+                _files
+                ;;
+            list-reverse)
+                _files
+                ;;
+            list-all-reverse)
+                _files
+                ;;
+            list-tree)
+                _files
+                ;;
             yt-download)
                 if [[ $CURRENT -eq 3 ]]; then
-                    _values 'mode' mp3 mp4
+                    _values 'mode' 'mp3' 'mp4'
                 elif [[ $CURRENT -eq 4 ]]; then
-                    _message 'YouTube URL'
+                    _message 'URL'
                 fi
                 ;;
-            # Media processing - take file arguments
-            remove-audio|convert-to-mp3|compress-video)
+            remove-audio)
                 _files
                 ;;
-            # System utilities
-            zed)
+            convert-to-mp3)
+                _files
+                ;;
+            compress-video)
                 _files
                 ;;
             mklink)
-                if [[ $CURRENT -eq 3 ]]; then
-                    _files
-                elif [[ $CURRENT -eq 4 ]]; then
-                    _message 'link name'
-                fi
-                ;;
-            # Navigation
-            goto)
-                _message 'shortcut name'
-                ;;
-            # File listing functions
-            list-files|list-all|list-reverse|list-all-reverse|list-tree|ls|la|lsr|lar|lt)
                 _files
                 ;;
-            # Environment helpers
-            ccflare-on|ccflare-off)
-                _message 'no arguments needed'
+            zed)
+                _files
+                ;;
+            killports)
+                _files
                 ;;
             *)
-                # Default to file completion for unknown commands
                 _files
                 ;;
         esac
