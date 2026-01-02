@@ -4,57 +4,134 @@
 # Dependencies: imagemagick (v7+ with 'magick' command)
 # Functions: img-resize-width, img-resize-percentage, img-optimize, img-convert, img-optimize-to-webp, img-resize, img-thumbnail, img-resize-exact, img-resize-fill, img-adaptive-resize, img-batch-resize, img-resize-shrink-only, img-resize-colorspace
 
+# Helper function to print ImageMagick installation instructions
+# Usage: _kit_imagemagick_install_help <mode>
+#   mode: "install" or "upgrade"
+_kit_imagemagick_install_help() {
+    local mode="$1"
+    local action="install"
+    local preface="Install with:"
+
+    if [[ "$mode" == "upgrade" ]]; then
+        action="upgrade"
+        preface="Upgrade instructions:"
+    fi
+
+    case "$(uname -s)" in
+        Darwin)
+            if [[ "$mode" == "upgrade" ]]; then
+                echo "  brew $action imagemagick" >&2
+                echo "  # If that doesn't work, try:" >&2
+                echo "  brew reinstall imagemagick" >&2
+            else
+                echo "  brew $action imagemagick" >&2
+            fi
+            ;;
+        Linux)
+            echo "  # Ubuntu/Debian - add official PPA for v7:" >&2
+            echo "  sudo add-apt-repository ppa:imagemagick/ppa" >&2
+            if [[ "$mode" == "upgrade" ]]; then
+                echo "  sudo apt update" >&2
+                echo "  sudo apt $action imagemagick" >&2
+            else
+                echo "  sudo apt update && sudo apt $action imagemagick" >&2
+            fi
+            echo "" >&2
+            echo "  # Fedora:" >&2
+            echo "  sudo dnf $action ImageMagick" >&2
+            echo "" >&2
+            echo "  # Arch:" >&2
+            echo "  sudo pacman -S imagemagick" >&2
+            ;;
+        *)
+            echo "  See: https://imagemagick.org/script/download.php" >&2
+            ;;
+    esac
+}
+
 # Helper function to check ImageMagick v7 availability
 _kit_require_imagemagick() {
-    if ! command -v magick &> /dev/null; then
-        echo "Error: ImageMagick v7 not found (requires 'magick' command)." >&2
+    # Check for v7 (magick command)
+    if command -v magick &> /dev/null; then
+        return 0
+    fi
+
+    # Check for v6 (convert command) and provide migration help
+    if command -v convert &> /dev/null; then
+        echo "Error: ImageMagick v6 detected. Kit requires ImageMagick v7+." >&2
         echo "" >&2
-        echo "Install with:" >&2
-        case "$(uname -s)" in
-            Darwin)
-                echo "  brew install imagemagick" >&2
-                ;;
-            Linux)
-                echo "  sudo apt install imagemagick      # Debian/Ubuntu (may need PPA for v7)" >&2
-                echo "  sudo dnf install imagemagick      # Fedora" >&2
-                echo "  sudo pacman -S imagemagick        # Arch" >&2
-                ;;
-            *)
-                echo "  See: https://imagemagick.org/script/download.php" >&2
-                ;;
-        esac
+        echo "You have ImageMagick v6 (uses 'convert' command)." >&2
+        echo "Kit's image functions require v7+ (uses 'magick' command)." >&2
+        echo "" >&2
+        echo "Upgrade instructions:" >&2
+        _kit_imagemagick_install_help "upgrade"
         return 1
     fi
-    return 0
+
+    # No ImageMagick found at all
+    echo "Error: ImageMagick not found. Install v7+ for image functions." >&2
+    echo "" >&2
+    echo "Install with:" >&2
+    _kit_imagemagick_install_help "install"
+    return 1
 }
 
 # Image Resize by Width (height auto-calculated to preserve aspect ratio)
 img-resize-width() {
-    if [[ "$1" == "-h" || -z "$1" ]]; then
-        cat << EOF
-Usage: kit img-resize-width <width> <file>
+    local force=false
+    local width=""
+    local input=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit img-resize-width <width> <file> [options]
 Description: Simple resize by width only, height auto-calculated, preserves aspect ratio
+Options:
+  -f, --force    Overwrite output file if it exists
 Examples:
   kit img-resize-width 800 photo.jpg
   kit img-resize-width 1920 landscape.png
+  kit img-resize-width 800 photo.jpg --force
 Output: Creates photo-resized.jpg
 EOF
-        return 0
+                return 0
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            *)
+                if [[ -z "$width" ]]; then
+                    width="$1"
+                elif [[ -z "$input" ]]; then
+                    input="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$width" ]]; then
+        echo "Error: Missing width parameter" >&2
+        return 2
     fi
 
-    if [[ -z "$2" ]]; then
+    if [[ -z "$input" ]]; then
         echo "Error: Missing input file" >&2
         return 2
     fi
 
     # Sanitize filename to prevent injection attacks
-    if [[ "$2" =~ [\|\&\$\`\'\;\<\>] ]]; then
+    if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
 
-    if [[ ! -f "$2" ]]; then
-        echo "Error: Input file '$2' does not exist" >&2
+    if [[ ! -f "$input" ]]; then
+        echo "Error: Input file '$input' does not exist" >&2
         return 1
     fi
 
@@ -62,18 +139,22 @@ EOF
         return 1
     fi
 
-    local input="$2"
     local filename="${input%.*}"
     local extension="${input##*.}"
     local output="${filename}-resized.${extension}"
 
     # Check if output file exists
     if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output'" >&2
+            rm -f "$output"
+        else
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
     fi
 
-    if magick "$input" -resize "$1" "$output" 2>/dev/null; then
+    if magick "$input" -resize "$width" "$output" 2>/dev/null; then
         echo "✅ Created: $output"
         return 0
     else
@@ -145,27 +226,52 @@ EOF
 
 # Image Optimization (strips metadata and compresses)
 img-optimize() {
-    if [[ "$1" == "-h" || -z "$1" ]]; then
-        cat << EOF
-Usage: kit img-optimize <file>
+    local force=false
+    local input=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit img-optimize <file> [options]
 Description: Optimize image by stripping metadata and compressing
 Effect: Strips EXIF/metadata and sets quality to 85%
+Options:
+  -f, --force    Overwrite output file if it exists
 Examples:
   kit img-optimize photo.jpg
-  kit img-optimize image.png
+  kit img-optimize image.png --force
 Output: Creates photo-optimized.jpg
 EOF
-        return 0
+                return 0
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            *)
+                if [[ -z "$input" ]]; then
+                    input="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$input" ]]; then
+        echo "Error: Missing input file" >&2
+        return 2
     fi
 
     # Sanitize filename to prevent injection attacks
-    if [[ "$1" =~ [\|\&\$\`\'\;\<\>] ]]; then
+    if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
 
-    if [[ ! -f "$1" ]]; then
-        echo "Error: Input file '$1' does not exist" >&2
+    if [[ ! -f "$input" ]]; then
+        echo "Error: Input file '$input' does not exist" >&2
         return 1
     fi
 
@@ -173,15 +279,19 @@ EOF
         return 1
     fi
 
-    local input="$1"
     local filename="${input%.*}"
     local extension="${input##*.}"
     local output="${filename}-optimized.${extension}"
 
     # Check if output file exists
     if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output'" >&2
+            rm -f "$output"
+        else
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
     fi
 
     if magick "$input" -strip -quality 85 "$output" 2>/dev/null; then
@@ -312,21 +422,52 @@ EOF
 
 # General image resize preserving aspect ratio
 img-resize() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" ]]; then
-        cat << EOF
-Usage: kit img-resize <width>x<height> <file>
+    local force=false
+    local size=""
+    local input=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit img-resize <width>x<height> <file> [options]
 Description: Resize image preserving aspect ratio, output has -resized suffix
+Options:
+  -f, --force    Overwrite output file if it exists
 Examples:
   kit img-resize 800x600 photo.jpg        # Fit within 800x600
   kit img-resize 1024 landscape.png       # Width 1024, height auto
-  kit img-resize 1920x1080 video_frame.jpg
+  kit img-resize 1920x1080 video_frame.jpg --force
 Output: Creates photo-resized.jpg
 EOF
-        return 0
+                return 0
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            *)
+                if [[ -z "$size" ]]; then
+                    size="$1"
+                elif [[ -z "$input" ]]; then
+                    input="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$size" ]]; then
+        echo "Error: Missing size parameter" >&2
+        return 2
     fi
 
-    local size="$1"
-    local input="$2"
+    if [[ -z "$input" ]]; then
+        echo "Error: Missing input file" >&2
+        return 2
+    fi
+
     local filename="${input%.*}"
     local extension="${input##*.}"
     local output="${filename}-resized.${extension}"
@@ -342,8 +483,13 @@ EOF
 
     # Check if output file exists
     if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output'" >&2
+            rm -f "$output"
+        else
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
     fi
 
     if magick "$input" -resize "$size" "$output" 2>/dev/null; then
