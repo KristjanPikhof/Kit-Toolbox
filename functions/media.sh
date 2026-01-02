@@ -320,17 +320,13 @@ EOF
 
     ffmpeg_cmd+=(-movflags +faststart "$output")
 
-    # Handle output redirection
-    if [[ "$verbose" == true ]]; then
-        if ! ffmpeg "${ffmpeg_cmd[@]}"; then
-            echo "Error: Failed to compress video file '$input'" >&2
-            return 1
-        fi
-    else
-        if ! ffmpeg "${ffmpeg_cmd[@]}" 2>/dev/null; then
-            echo "Error: Failed to compress video file '$input'" >&2
-            return 1
-        fi
+    # Execute with appropriate output redirection
+    local ffmpeg_output="/dev/null"
+    [[ "$verbose" == true ]] && ffmpeg_output="/dev/stderr"
+
+    if ! ffmpeg "${ffmpeg_cmd[@]}" 2>"$ffmpeg_output"; then
+        echo "Error: Failed to compress video file '$input'" >&2
+        return 1
     fi
 
     local input_size=$(du -h "$input" | cut -f1)
