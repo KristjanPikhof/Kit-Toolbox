@@ -132,7 +132,7 @@ kit yt-download mp3 "https://youtube.com/watch?v=..."
 
 ### 📷 Image Processing
 Process images using ImageMagick:
-- **img-rename** — Sanitize image filenames or rename sequentially (image_1.jpg, image_2.jpg)
+- **img-rename** — Sanitize image filenames or rename sequentially. Features: custom separators (`_` or `-`), sequential naming with `--name`, recursive processing (`-r`), and dry-run mode (`-n`).
 - **img-resize** — Resize image preserving aspect ratio
 - **img-resize-width** — Resize image to specific width (auto height)
 - **img-resize-percentage** — Resize image by percentage (for upscaling/downscaling)
@@ -310,6 +310,10 @@ Renamed: IMG_001.jpg -> photo_1.jpg
 Renamed: DSC_123.png -> photo_2.png
 $ kit img-rename . --name "img" --start 10
 Renamed: photo.jpg -> img_10.jpg
+
+# Recursive sanitization with dry-run
+$ kit img-rename . --recursive --sep "-" --dry-run
+Would rename: subfolder/my image.png -> subfolder/my-image.png
 
 # Compress video (more complex with options)
 $ kit compress-video video.mp4
