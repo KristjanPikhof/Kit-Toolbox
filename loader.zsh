@@ -138,10 +138,10 @@ _kit_validate_editor_command() {
     local cmd="$1"
     # Basic validation: editor commands should only contain safe characters
     # Allow: alphanumeric, spaces, tabs, slashes, dashes, dots, underscores, quotes
-    # Reject: command substitution, variable expansion, pipes, redirects, backticks
-    if [[ "$cmd" == *'`'* ]] || [[ "$cmd" == *'$('* ]] || [[ "$cmd" == *'|'* ]] || \
-       [[ "$cmd" == *'>'* ]] || [[ "$cmd" == *'<'* ]] || [[ "$cmd" == *'&&'* ]] || \
-       [[ "$cmd" == *';'* ]]; then
+    # Reject: command substitution, variable expansion, pipes, redirects, backticks, arithmetic expansion
+    if [[ "$cmd" == *'`'* ]] || [[ "$cmd" == *'$('* ]] || [[ "$cmd" == *'$['* ]] || \
+       [[ "$cmd" == *'|'* ]] || [[ "$cmd" == *'>'* ]] || [[ "$cmd" == *'<'* ]] || \
+       [[ "$cmd" == *'&&'* ]] || [[ "$cmd" == *';'* ]]; then
         return 1
     fi
     return 0
