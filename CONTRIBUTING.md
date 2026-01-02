@@ -158,18 +158,44 @@ kit my-function nonexistent.txt  # Should show error and return 1
 kit my-function valid.txt  # Should succeed
 ```
 
-### Step 7: Update Completions (Optional)
+### Step 7: Update Completions (Automatic - No Action Needed)
 
-If your function has special argument handling, update `completions/_kit`:
+**The completion system is FULLY DYNAMIC!** When you add a new function to a category file, tab completion works automatically after reloading your shell:
 
-```zsh
-# In the case statement for individual commands:
-my-function)
-    _files
-    ;;
+```bash
+source ~/.zshrc
+# or
+exec zsh
 ```
 
-Or auto-generate:
+The completion system automatically discovers:
+- All functions from `functions/*.sh` (via `# Functions:` headers)
+- All editor shortcuts from `editor.conf`
+- All navigation shortcuts from `shortcuts.conf`
+
+**For functions with custom completion options:**
+
+If your function needs special tab completion (like `yt-download` completing `mp3|mp4`), edit the `_kit_get_custom_completion()` function in `completions/_kit`:
+
+```zsh
+_kit_get_custom_completion() {
+    local cmd="$1"
+    local pos="$2"
+
+    case "$cmd" in
+        your-new-function)
+            if [[ $pos -eq 3 ]]; then
+                _values 'options' 'option1' 'option2' 'option3'
+                return 0
+            fi
+            ;;
+    esac
+
+    return 1
+}
+```
+
+**To verify the completion system:**
 ```bash
 ./scripts/generate-completions.sh
 ```

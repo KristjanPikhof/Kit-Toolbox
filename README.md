@@ -37,8 +37,8 @@ Functions organized by category (images, media, system, navigation, etc.). Each 
 🎯 **Discoverability**
 Built-in help system with `kit -h` shows all functions grouped by category. Search functions with `kit --search <keyword>`.
 
-⚡ **Tab Completion**
-Full zsh tab completion for function names and arguments. Type `kit res<TAB>` and it suggests all matching functions.
+⚡ **Dynamic Tab Completion**
+Auto-discovering tab completion for functions, editors, and shortcuts. No manual regeneration needed!
 
 🤖 **AI-Friendly**
 Clear development patterns, template generator, and validator make it easy for AI agents (and humans) to add new functions consistently.
@@ -248,7 +248,7 @@ kit-toolkit/
 ├── scripts/                  # Development and maintenance tools
 │   ├── new-function.sh       # Template generator for new functions
 │   ├── validate-pattern.sh   # Validator for pattern compliance
-│   ├── generate-completions.sh  # Auto-generate completion script
+│   ├── generate-completions.sh  # Completion system verifier (system is fully dynamic)
 │   └── validate-shortcuts.sh # Validate shortcuts configuration
 │
 └── llm_prompts/              # AI development guides
@@ -416,12 +416,33 @@ Disable auto-generation of shortcuts:
 export KIT_AUTO_SHORTCUTS=false
 ```
 
-### Auto-generating Completions
+### Tab Completion System
 
-After adding new functions, regenerate tab completion:
+**The completion system is FULLY DYNAMIC!**
+
+After adding new functions, editor shortcuts, or navigation shortcuts, simply reload your shell:
+
+```bash
+source ~/.zshrc
+# or
+exec zsh
+```
+
+The completion system automatically discovers:
+- All functions from `functions/*.sh` (via `# Functions:` headers)
+- All editor shortcuts from `editor.conf`
+- All navigation shortcuts from `shortcuts.conf`
+
+**No manual regeneration needed!**
+
+To verify the completion system is working:
 ```bash
 ./scripts/generate-completions.sh
 ```
+
+**For functions with custom completion options:**
+
+If your function needs special tab completion (like `yt-download` completing `mp3|mp4`), edit the `_kit_get_custom_completion()` function in `completions/_kit`.
 
 ## Pattern Requirements
 
