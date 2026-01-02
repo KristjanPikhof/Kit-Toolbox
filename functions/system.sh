@@ -107,8 +107,16 @@ EOF
             continue
         fi
 
-        # Validate port range
-        if [[ "$port" -lt 1 || "$port" -gt 65535 ]]; then
+        # Check for leading zeros (except single zero) to prevent octal interpretation
+        if [[ "$port" =~ ^0[0-9]+$ ]]; then
+            echo "Error: Port '$port' has leading zeros. Use decimal notation without leading zeros." >&2
+            failed_count=$((failed_count + 1))
+            continue
+        fi
+
+        # Validate port range (use 10# to force decimal interpretation)
+        local port_decimal=$((10#$port))
+        if [[ $port_decimal -lt 1 ]] || [[ $port_decimal -gt 65535 ]]; then
             echo "Error: Port '$port' is out of valid range (1-65535)." >&2
             failed_count=$((failed_count + 1))
             continue
@@ -272,14 +280,16 @@ EOF
 
     # Remove lines between the Kit marker and the line that sources loader.zsh
     # Using awk for cross-platform compatibility (macOS/BSD and Linux/GNU)
+    # Use index() for literal string matching to avoid regex metacharacter issues
     # Pattern matches version-agnostic marker: "# Kit X.Y.Z - Shell Toolkit"
     # Pattern handles various quoting styles:
     #   source "$KIT_EXT_DIR/loader.zsh"
     #   source $KIT_EXT_DIR/loader.zsh
     #   . "$KIT_EXT_DIR/loader.zsh"
     #   . $KIT_EXT_DIR/loader.zsh
-    awk -v marker="$kit_marker_pattern" '
-        $0 ~ marker { in_kit_block = 1; next }
+    awk -v marker="# Kit" '
+        BEGIN { in_kit_block = 0 }
+        index($0, marker) == 1 && /Shell Toolkit/ { in_kit_block = 1; next }
         in_kit_block && /loader\.zsh/ { in_kit_block = 0; next }
         !in_kit_block { print }
     ' "$active_config" > "$tmp_file"
@@ -367,31 +377,28 @@ EOF
     echo "Current version: ${current_version}"
     echo ""
 
-    # Save current branch
-    cd "$KIT_EXT_DIR" || return 1
-    local current_branch="$(git branch --show-current 2>/dev/null || echo "HEAD")"
+    # Get current branch using subshell to avoid changing working directory
+    local current_branch="$(cd "$KIT_EXT_DIR" && git branch --show-current 2>/dev/null || echo "HEAD")"
 
     echo "Checking for updates..."
-    # Fetch latest changes without checking them out
-    git fetch -q origin 2>/dev/null
-
-    if [[ $? -ne 0 ]]; then
+    # Fetch latest changes using subshell to avoid changing working directory
+    if ! (cd "$KIT_EXT_DIR" && git fetch -q origin 2>/dev/null); then
         echo "Warning: Could not fetch updates. Check your internet connection." >&2
         return 1
     fi
 
-    # Get local and remote commit hashes
-    local local_commit="$(git rev-parse HEAD 2>/dev/null)"
-    local remote_commit="$(git rev-parse @{u} 2>/dev/null)"
+    # Get local and remote commit hashes using subshell
+    local local_commit="$(cd "$KIT_EXT_DIR" && git rev-parse HEAD 2>/dev/null)"
+    local remote_commit="$(cd "$KIT_EXT_DIR" && git rev-parse @{u} 2>/dev/null)"
 
     if [[ "$local_commit" == "$remote_commit" ]]; then
         echo "Already up to date!"
         return 0
     fi
 
-    # Get remote version
+    # Get remote version using subshell
     local remote_version="unknown"
-    remote_version="$(git show origin/${current_branch}:VERSION 2>/dev/null | tr -d '[:space:]')" && [[ -n "$remote_version" ]] || remote_version="unknown"
+    remote_version="$(cd "$KIT_EXT_DIR" && git show origin/${current_branch}:VERSION 2>/dev/null | tr -d '[:space:]')" && [[ -n "$remote_version" ]] || remote_version="unknown"
 
     echo "Update available: ${remote_version}"
     echo ""
@@ -411,8 +418,8 @@ EOF
     echo ""
     echo "Updating..."
 
-    # Pull latest changes
-    if git pull -q; then
+    # Pull latest changes using subshell to avoid changing working directory
+    if (cd "$KIT_EXT_DIR" && git pull -q); then
         echo "Successfully updated to version ${remote_version}"
 
         # Check if VERSION changed
