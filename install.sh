@@ -90,9 +90,95 @@ print_success "Added Kit configuration to .zshrc"
 echo ""
 print_info "Checking optional dependencies..."
 
+# Source shared package manager detection functions from deps.sh
+if [[ -f "$KIT_DIR/functions/deps.sh" ]]; then
+    source "$KIT_DIR/functions/deps.sh"
+
+    # Create wrapper functions to use the internal functions from deps.sh
+    detect_package_manager() {
+        _kit_detect_package_manager
+    }
+
+    get_install_cmd() {
+        local pkg="$1"
+        _kit_get_package_install_cmd "$pkg"
+    }
+else
+    # Fallback functions if deps.sh is not available
+    detect_package_manager() {
+        case "$(uname -s)" in
+            Darwin)
+                if command -v brew &> /dev/null; then
+                    echo "brew"
+                else
+                    echo "none"
+                fi
+                ;;
+            Linux)
+                if command -v apt &> /dev/null; then
+                    echo "apt"
+                elif command -v dnf &> /dev/null; then
+                    echo "dnf"
+                elif command -v yum &> /dev/null; then
+                    echo "yum"
+                elif command -v pacman &> /dev/null; then
+                    echo "pacman"
+                elif command -v zypper &> /dev/null; then
+                    echo "zypper"
+                else
+                    echo "none"
+                fi
+                ;;
+            *)
+                echo "none"
+                ;;
+        esac
+    }
+
+    get_install_cmd() {
+        local pkg="$1"
+        local pm="$(detect_package_manager)"
+        local os="$(uname -s)"
+
+        case "$pm" in
+            brew)
+                echo "brew install $pkg"
+                ;;
+            apt)
+                echo "sudo apt update && sudo apt install -y $pkg"
+                ;;
+            dnf)
+                echo "sudo dnf install -y $pkg"
+                ;;
+            yum)
+                echo "sudo yum install -y $pkg"
+                ;;
+            pacman)
+                echo "sudo pacman -S --noconfirm $pkg"
+                ;;
+            zypper)
+                echo "sudo zypper install -y $pkg"
+                ;;
+            none)
+                case "$os" in
+                    Darwin)
+                        echo "Error: Homebrew not found."
+                        echo "Install with: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+                        echo "See: https://brew.sh"
+                        ;;
+                    Linux)
+                        echo "Error: No supported package manager found (apt, dnf, yum, pacman, zypper)"
+                        ;;
+                esac
+                return 1
+                ;;
+        esac
+    }
+fi
+
 check_dependency() {
     local cmd="$1"
-    local brew_pkg="$2"
+    local pkg="$2"
     local category="$3"
 
     if command -v "$cmd" &> /dev/null; then
@@ -100,7 +186,14 @@ check_dependency() {
         return 0
     else
         print_warning "$cmd not found (needed for $category)"
-        echo "   Install with: brew install $brew_pkg"
+        local install_cmd
+        install_cmd=$(get_install_cmd "$pkg")
+        # Check if output doesn't start with "Error"
+        if [[ "$install_cmd" != Error:* ]]; then
+            echo "   Install with: $install_cmd"
+        else
+            echo "   $install_cmd"
+        fi
         return 1
     fi
 }
@@ -117,19 +210,31 @@ if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
     echo ""
     print_info "Missing optional dependencies: ${MISSING_DEPS[*]}"
 
-    if command -v brew &> /dev/null; then
+    local pm="$(detect_package_manager)"
+    if [[ "$pm" != "none" ]]; then
         echo ""
-        read "response?Install missing dependencies with Homebrew? (y/N): "
+        read "response?Install missing dependencies? (y/N): "
         if [[ "$response" =~ ^[Yy]$ ]]; then
             print_info "Installing dependencies..."
             for dep in "${MISSING_DEPS[@]}"; do
-                brew install "$dep"
+                local install_cmd
+                install_cmd=$(get_install_cmd "$dep")
+                if eval "$install_cmd"; then
+                    print_success "$dep installed"
+                else
+                    print_error "Failed to install $dep"
+                fi
             done
-            print_success "Dependencies installed"
+            print_success "Dependency installation complete"
         fi
     else
-        print_warning "Homebrew not found. Install from: https://brew.sh"
-        print_info "Then run: brew install ${MISSING_DEPS[*]}"
+        print_warning "No supported package manager found."
+        if [[ "$(uname -s)" == "Darwin" ]]; then
+            print_info "Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+            print_info "Then run: kit deps-install"
+        else
+            print_info "Install a package manager (apt, dnf, yum, pacman, zypper) then run: kit deps-install"
+        fi
     fi
 fi
 
