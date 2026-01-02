@@ -4,9 +4,6 @@
 # Dependencies: lsd (brew install lsd)
 # Functions: list-files, list-all, list-reverse, list-all-reverse, list-tree
 
-# Remove conflicting aliases
-unalias ls lsa lsr lsar lt la lr lar 2>/dev/null || true
-
 # Check if lsd is installed
 _check_lsd() {
     if ! command -v lsd &> /dev/null; then
@@ -20,11 +17,11 @@ list-files() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
 Usage: kit list-files [directory]
-Alias: ls
+Alias: kls
 Description: List files in long format sorted by modification time (newest first)
 Example:
   kit list-files          # Current directory
-  kit ls ~/projects       # Using alias
+  kit kls ~/projects      # Using alias
 EOF
         return 0
     fi
@@ -33,7 +30,7 @@ EOF
     lsd -lt "${1:-.}"
 }
 
-ls() {
+kls() {
     list-files "$@"
 }
 
@@ -42,11 +39,11 @@ list-all() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
 Usage: kit list-all [directory]
-Alias: la
+Alias: kla
 Description: List all files including hidden (dot) files in long format, sorted by modification time
 Example:
   kit list-all          # Current directory
-  kit la ~/.config      # Using alias
+  kit kla ~/.config     # Using alias
 EOF
         return 0
     fi
@@ -55,7 +52,7 @@ EOF
     lsd -lat "${1:-.}"
 }
 
-la() {
+kla() {
     list-all "$@"
 }
 
@@ -64,11 +61,11 @@ list-reverse() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
 Usage: kit list-reverse [directory]
-Alias: lsr
+Alias: ksr
 Description: List files in long format in reverse order (oldest first)
 Example:
   kit list-reverse          # Current directory
-  kit lsr ~/downloads       # Using alias
+  kit ksr ~/downloads       # Using alias
 EOF
         return 0
     fi
@@ -77,7 +74,7 @@ EOF
     lsd -ltr "${1:-.}"
 }
 
-lsr() {
+ksr() {
     list-reverse "$@"
 }
 
@@ -86,11 +83,11 @@ list-all-reverse() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
 Usage: kit list-all-reverse [directory]
-Alias: lar
+Alias: kar
 Description: List all files including hidden (dot) files in reverse order (oldest first)
 Example:
   kit list-all-reverse          # Current directory
-  kit lar ~/archive             # Using alias
+  kit kar ~/archive             # Using alias
 EOF
         return 0
     fi
@@ -99,7 +96,7 @@ EOF
     lsd -latr "${1:-.}"
 }
 
-lar() {
+kar() {
     list-all-reverse "$@"
 }
 
@@ -108,11 +105,11 @@ list-tree() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
 Usage: kit list-tree [directory]
-Alias: lt
+Alias: klt
 Description: Display directory contents as a tree structure
 Example:
   kit list-tree          # Current directory
-  kit lt ~/project       # Using alias
+  kit klt ~/project      # Using alias
 EOF
         return 0
     fi
@@ -121,7 +118,7 @@ EOF
     lsd --tree "${1:-.}"
 }
 
-lt() {
+klt() {
     list-tree "$@"
 }
 

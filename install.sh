@@ -80,8 +80,10 @@ print_info "Adding Kit configuration to .zshrc..."
 # Matches any "# Kit <version> - Shell Toolkit" marker
 if grep -q "# Kit.*- Shell Toolkit" "$ZSHRC" 2>/dev/null; then
     # Use awk for cross-platform compatibility
+    # Use index() for literal string matching to avoid regex metacharacter issues
     awk '
-        /# Kit.*- Shell Toolkit/ { in_kit_block = 1; next }
+        BEGIN { in_kit_block = 0 }
+        index($0, "# Kit") == 1 && /Shell Toolkit/ { in_kit_block = 1; next }
         in_kit_block && /loader\.zsh/ { in_kit_block = 0; next }
         !in_kit_block { print }
     ' "$ZSHRC" > "$ZSHRC.tmp"

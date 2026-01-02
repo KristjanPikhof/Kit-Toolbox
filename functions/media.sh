@@ -60,24 +60,44 @@ EOF
 }
 
 remove-audio() {
-    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
-        cat << EOF
-Usage: kit remove-audio <input_video_file>
+    local force=false
+    local input=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit remove-audio <input_video_file> [options]
 Description: Removes audio track from video file and optimizes for smaller size
+Options:
+  -f, --force    Overwrite output file if it exists
 Example: kit remove-audio video.mp4
 Output: Creates video_noaudio.mp4
 EOF
-        return 0
-    fi
+                return 0
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            *)
+                if [[ -z "$input" ]]; then
+                    input="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
 
     # Input validation
-    if [[ -z "$1" ]]; then
+    if [[ -z "$input" ]]; then
         echo "Error: Missing input video file" >&2
         return 2
     fi
 
-    if [[ ! -f "$1" ]]; then
-        echo "Error: Input file '$1' does not exist" >&2
+    if [[ ! -f "$input" ]]; then
+        echo "Error: Input file '$input' does not exist" >&2
         return 1
     fi
 
@@ -87,8 +107,18 @@ EOF
         return 1
     fi
 
-    local input="$1"
     local output="${input%.*}_noaudio.mp4"
+
+    # Check if output file exists
+    if [[ -f "$output" ]]; then
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output'" >&2
+            rm -f "$output"
+        else
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
+    fi
 
     # Process video
     if ! ffmpeg -i "$input" -c:v libx264 -crf 23 -preset fast -an -movflags +faststart "$output" 2>/dev/null; then
@@ -100,24 +130,43 @@ EOF
 }
 
 convert-to-mp3() {
-    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
-        cat << EOF
-Usage: kit convert-to-mp3 <input_media_file>
+    local force=false
+    local input=""
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit convert-to-mp3 <input_media_file> [options]
 Description: Extract audio from video file and convert to MP3 format (320kbps)
+Options:
+  -f, --force    Overwrite output file if it exists
 Example: kit convert-to-mp3 video.mkv
 Output: Creates video.mp3
 EOF
-        return 0
-    fi
+                return 0
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            *)
+                if [[ -z "$input" ]]; then
+                    input="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
 
-    # Input validation
-    if [[ -z "$1" ]]; then
+    if [[ -z "$input" ]]; then
         echo "Error: Missing input media file" >&2
         return 2
     fi
 
-    if [[ ! -f "$1" ]]; then
-        echo "Error: Input file '$1' does not exist" >&2
+    if [[ ! -f "$input" ]]; then
+        echo "Error: Input file '$input' does not exist" >&2
         return 1
     fi
 
@@ -127,8 +176,19 @@ EOF
         return 1
     fi
 
-    local input="$1"
-    local output="${input%.*}.mp3"
+    local filename="${input%.*}"
+    local output="${filename}.mp3"
+
+    # Check if output file exists
+    if [[ -f "$output" ]]; then
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output'" >&2
+            rm -f "$output"
+        else
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
+    fi
 
     # Convert to MP3
     if ! ffmpeg -i "$input" -vn -acodec libmp3lame -ab 320k "$output" 2>/dev/null; then
@@ -225,19 +285,46 @@ EOF
         output="${input%.*}_compressed.mp4"
     fi
 
-    local vf_filter=""
+    # Validate CRF value (must be numeric, 0-51)
+    if ! [[ "$crf" =~ ^[0-9]+$ ]] || [[ "$crf" -lt 0 ]] || [[ "$crf" -gt 51 ]]; then
+        echo "Error: Invalid CRF value '$crf'. Must be between 0 and 51." >&2
+        return 2
+    fi
+
+    # Validate preset (must be one of the allowed values)
+    local valid_presets=(ultrafast superfast veryfast faster fast medium slow slower veryslow)
+    local preset_valid=false
+    for p in "${valid_presets[@]}"; do
+        if [[ "$preset" == "$p" ]]; then
+            preset_valid=true
+            break
+        fi
+    done
+    if [[ "$preset_valid" == false ]]; then
+        echo "Error: Invalid preset '$preset'. Must be one of: ${valid_presets[*]}" >&2
+        return 2
+    fi
+
+    # Validate width (must be -1 or positive integer)
+    if [[ "$width" != "-1" ]] && ! [[ "$width" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid width '$width'. Must be -1 or a positive integer." >&2
+        return 2
+    fi
+
+    # Build ffmpeg command as array for safe execution
+    local -a ffmpeg_cmd=(ffmpeg -i "$input" -c:v libx264 -crf "$crf" -preset "$preset" -c:a aac -b:a "$bitrate")
+
     if [[ "$width" != "-1" ]]; then
-        vf_filter="-vf \"scale=$width:-1\""
+        ffmpeg_cmd+=(-vf "scale=$width:-1")
     fi
 
+    ffmpeg_cmd+=(-movflags +faststart "$output")
+
+    # Execute with appropriate output redirection
     local ffmpeg_output="/dev/null"
-    if [[ "$verbose" == true ]]; then
-        ffmpeg_output="/dev/stderr"
-    fi
+    [[ "$verbose" == true ]] && ffmpeg_output="/dev/stderr"
 
-    local ffmpeg_cmd="ffmpeg -i \"$input\" -c:v libx264 -crf $crf -preset $preset -c:a aac -b:a $bitrate $vf_filter -movflags +faststart \"$output\" 2>$ffmpeg_output"
-
-    if ! eval "$ffmpeg_cmd"; then
+    if ! ffmpeg "${ffmpeg_cmd[@]}" 2>"$ffmpeg_output"; then
         echo "Error: Failed to compress video file '$input'" >&2
         return 1
     fi

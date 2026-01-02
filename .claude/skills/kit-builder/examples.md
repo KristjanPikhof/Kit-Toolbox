@@ -513,6 +513,171 @@ echo "=== Tests complete ==="
 
 ---
 
+## Example 6: Security-Safe Function with --force Flag
+
+**User Request:** "Create a function to compress videos that's safe against command injection"
+
+**Key Security Considerations:**
+- Sanitize all user input
+- Use arrays for command building (prevent injection)
+- Warn before overwriting
+- Use safer error handling pattern
+
+**Implementation:**
+
+```bash
+# Generated using:
+./scripts/new-function.sh media compress-video-safe "Compress videos with security safeguards"
+
+# In functions/media.sh:
+compress-video-safe() {
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        cat << EOF
+Usage: kit compress-video-safe <input> [options]
+Description: Compress video files with security safeguards
+Options:
+  -c, --crf NUM      Quality level 18-28 (default: 23)
+  -w, --width NUM    Scale width (default: 1280, -1 for no scaling)
+  -f, --force        Overwrite output file if it exists
+Examples:
+  kit compress-video-safe video.mp4
+  kit compress-video-safe video.mp4 --force
+  kit compress-video-safe video.mp4 -c 28 -w 1920
+EOF
+        return 0
+    fi
+
+    local crf=23
+    local width=1280
+    local force=false
+    local input=""
+
+    # Parse arguments first
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -c|--crf)
+                crf="$2"
+                shift 2
+                ;;
+            -w|--width)
+                width="$2"
+                shift 2
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            *)
+                if [[ -z "$input" ]]; then
+                    input="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # Validate input
+    if [[ -z "$input" ]]; then
+        echo "Error: Missing input video file" >&2
+        return 2
+    fi
+
+    # Sanitize filename (prevent command injection)
+    if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
+        echo "Error: Filename contains invalid characters" >&2
+        return 2
+    fi
+
+    if [[ ! -f "$input" ]]; then
+        echo "Error: Input file '$input' does not exist" >&2
+        return 1
+    fi
+
+    # Validate CRF (must be numeric, 0-51)
+    if ! [[ "$crf" =~ ^[0-9]+$ ]] || [[ "$crf" -lt 0 ]] || [[ "$crf" -gt 51 ]]; then
+        echo "Error: Invalid CRF value '$crf'. Must be between 0 and 51." >&2
+        return 2
+    fi
+
+    # Validate width (must be -1 or positive integer)
+    if [[ "$width" != "-1" ]] && ! [[ "$width" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid width '$width'. Must be -1 or a positive integer." >&2
+        return 2
+    fi
+
+    # Check dependency
+    if ! command -v ffmpeg &> /dev/null; then
+        echo "Error: ffmpeg not installed. Install with: brew install ffmpeg" >&2
+        return 1
+    fi
+
+    # Determine output file
+    local output="${input%.*}_compressed.mp4"
+
+    # Check if output exists (with force flag support)
+    if [[ -f "$output" ]]; then
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output'" >&2
+            rm -f "$output"
+        else
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
+    fi
+
+    # Build command as array (safe, prevents injection)
+    local -a ffmpeg_cmd=(ffmpeg -i "$input" -c:v libx264 -crf "$crf" -preset fast -c:a aac -b:a 128k)
+
+    if [[ "$width" != "-1" ]]; then
+        ffmpeg_cmd+=(-vf "scale=$width:-1")
+    fi
+
+    ffmpeg_cmd+=(-movflags +faststart "$output")
+
+    # Execute using safer error handling pattern
+    if ! ffmpeg "${ffmpeg_cmd[@]}" 2>/dev/null; then
+        echo "Error: Failed to compress video file '$input'" >&2
+        return 1
+    fi
+
+    echo "✅ Compressed: $output"
+    return 0
+}
+```
+
+**Security Features Demonstrated:**
+1. **Input sanitization** - Rejects shell metacharacters in filenames
+2. **Numeric validation** - Ensures CRF and width are valid numbers
+3. **Array-based command building** - Prevents command injection
+4. **`if ! command` pattern** - More reliable than `$?`
+5. **`--force` flag with warning** - Prevents accidental data loss
+
+**Testing:**
+```bash
+source $KIT_EXT_DIR/loader.zsh
+
+# Test help
+kit compress-video-safe -h
+
+# Test invalid input (should return 2)
+kit compress-video-safe
+echo $?  # Should be 2
+
+# Test file not found (should return 1)
+kit compress-video-safe /nonexistent/file.mp4
+echo $?  # Should be 1
+
+# Test malicious filename (should be rejected)
+kit compress-video-safe "file;rm -rf /.mp4"
+echo $?  # Should be 2
+
+# Test force flag behavior
+kit compress-video-safe test.mp4
+kit compress-video-safe test.mp4 --force  # Should warn and overwrite
+```
+
+---
+
 ## Common Patterns Quick Reference
 
 **Single file input:**
@@ -555,6 +720,58 @@ for file in *.jpg; do
     ((current++))
 done
 printf "\n"
+```
+
+**Force flag with warning:**
+```bash
+if [[ -f "$output" ]]; then
+    if [[ "$force" == true ]]; then
+        echo "Warning: Overwriting existing file '$output'" >&2
+        rm -f "$output"
+    else
+        echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+        return 1
+    fi
+fi
+```
+
+**Safer error handling:**
+```bash
+# GOOD - Direct negation
+if ! process_command "$input" "$output"; then
+    echo "Error: Processing failed" >&2
+    return 1
+fi
+
+# BAD - Fragile pattern
+process_command "$input" "$output"
+if [[ $? -ne 0 ]]; then
+    echo "Error: Processing failed" >&2
+    return 1
+fi
+```
+
+**Input sanitization:**
+```bash
+# Reject shell metacharacters in filenames
+if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
+    echo "Error: Filename contains invalid characters" >&2
+    return 1
+fi
+```
+
+**Array-based command building (prevents injection):**
+```bash
+# Build command as array
+local -a cmd=(ffmpeg -i "$input" -c:v libx264 -crf "$crf" "$output")
+
+# Add optional arguments conditionally
+if [[ "$width" != "-1" ]]; then
+    cmd+=(-vf "scale=$width:-1")
+fi
+
+# Execute safely
+"${cmd[@]}"
 ```
 
 These examples demonstrate the full range of function creation scenarios and patterns supported by the Kit Builder skill.

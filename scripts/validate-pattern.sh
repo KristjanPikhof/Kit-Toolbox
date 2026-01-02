@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 # validate-pattern.sh - Validate function files against kit_pattern.md
 #
 # Checks that all functions follow the established pattern including:
@@ -8,7 +8,8 @@
 # - Category header present
 # - Function documented in file header
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Zsh equivalent of BASH_SOURCE dirname
+SCRIPT_DIR="${0:A:h}"
 EXT_DIR="$(dirname "$SCRIPT_DIR")"
 FUNCTIONS_DIR="$EXT_DIR/functions"
 
