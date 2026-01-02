@@ -264,19 +264,86 @@ kit function-name file-with-spaces.txt
 kit function-name "file with special chars !@#.txt"
 ```
 
-### Phase 8: Update Completions (Optional)
+### Phase 8: Update Completions (Automatic - No Action Needed)
 
-If the function needs custom tab completion:
+**The completion system is FULLY DYNAMIC!**
+
+When you add a new function to a category file, tab completion works automatically after reloading your shell:
+
 ```bash
-cd $KIT_EXT_DIR
+source $KIT_EXT_DIR/loader.zsh
+```
+
+**What the completion system automatically discovers:**
+- All functions from `functions/*.sh` (via `# Functions:` headers)
+- All editor shortcuts from `editor.conf`
+- All navigation shortcuts from `shortcuts.conf`
+
+**For functions with custom completion options:**
+
+If your function needs special tab completion (like `yt-download` completing `mp3|mp4`), edit the `_kit_get_custom_completion()` function in `completions/_kit`:
+
+```bash
+_kit_get_custom_completion() {
+    local cmd="$1"
+    local pos="$2"
+
+    case "$cmd" in
+        your-new-function)
+            if [[ $pos -eq 3 ]]; then
+                _values 'options' 'option1' 'option2' 'option3'
+                return 0
+            fi
+            ;;
+        # ... existing cases ...
+    esac
+
+    return 1
+}
+```
+
+**Verification:**
+```bash
+# Run to verify the completion system is working
 ./scripts/generate-completions.sh
 ```
 
-This auto-generates basic completion. For advanced completion (file type filters, option completion), manually edit `completions/_kit`.
+### Phase 9: Update Documentation (REQUIRED)
 
-### Phase 9: Document the Function
+**Documentation updates are MANDATORY for every new or modified function.**
 
-Add entry to project documentation if creating significant new functionality.
+After creating or modifying a function, you MUST update:
+
+1. **Category File Header** (Already done in Phase 5)
+   - Ensure function is listed in `# Functions:` line
+   - Verify dependencies are listed
+
+2. **README.md** (if adding new functions)
+   - Add function to the appropriate category section
+   - Include brief description and usage example
+   - Location: Look for sections like "## Available Functions" → "### 📷 Image Processing"
+
+3. **Function Help Block** (Already done in Phase 4)
+   - Ensure `-h` and `--help` show clear usage
+   - Include examples in help text
+
+**When to update README.md:**
+- Adding a NEW function to the toolkit
+- Adding a NEW category
+- Changing function behavior significantly
+
+**When README.md update is NOT required:**
+- Bug fixes that don't change usage
+- Internal refactoring
+- Performance improvements
+
+**Example README.md entry format:**
+```markdown
+### 📷 Image Processing
+Process images using ImageMagick:
+- **img-resize** — Resize image preserving aspect ratio
+- **your-new-function** — Brief one-line description
+```
 
 ## Integration with Toolkit Scripts
 
@@ -297,10 +364,11 @@ Add entry to project documentation if creating significant new functionality.
    ./scripts/validate-shortcuts.sh
    ```
 
-4. **generate-completions.sh** - Completion generator
+4. **generate-completions.sh** - Completion system verifier
    ```bash
    ./scripts/generate-completions.sh
    ```
+   Note: The completion system is fully dynamic. This script verifies the system is working correctly.
 
 ## Common Function Patterns
 
@@ -551,6 +619,7 @@ Before considering the function complete:
 - [ ] Pattern validation passes
 - [ ] All test cases pass
 - [ ] Works with files containing spaces/special chars
+- [ ] **Documentation updated** (README.md for new functions, help block always)
 
 ## Best Practices
 
