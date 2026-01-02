@@ -125,7 +125,8 @@ EOF
     fi
 
     # Sanitize filename to prevent injection attacks
-    if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
+    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
+    if [[ "$input" =~ [|&\$';<>] ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
@@ -185,7 +186,8 @@ EOF
     fi
 
     # Sanitize filename to prevent injection attacks
-    if [[ "$2" =~ [\|\&\$\`\'\;\<\>] ]]; then
+    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
+    if [[ "$2" =~ [|&\$';<>] ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
@@ -265,7 +267,8 @@ EOF
     fi
 
     # Sanitize filename to prevent injection attacks
-    if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
+    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
+    if [[ "$input" =~ [|&\$';<>] ]]; then
         echo "Error: Filename contains invalid characters" >&2
         return 1
     fi
