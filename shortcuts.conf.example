@@ -1,11 +1,11 @@
-# shortcuts.conf - Directory shortcuts for 'goto' command
+# shortcuts.conf - Directory shortcuts for quick navigation
 # Format: shortcut_name|full_path|description
 #
 # Fields (pipe-separated):
-# 1. Shortcut name (used with: kit goto <name>)
+# 1. Shortcut name (used with: kit <name>)
 # 2. Full path (can use ~ for home directory)
 # 3. Description
 
 # Development projects
-claude|~/.claude/|Claude CLI directory
-opencode|~/.config/opencode/|Opencode CLI directory
+claudedir|~/.claude/|Claude CLI directory
+opencodedir|~/.config/opencode/|Opencode CLI directory
