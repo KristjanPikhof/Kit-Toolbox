@@ -43,6 +43,31 @@ fi
 # ============================================================================
 
 KIT_NAV_ALIASES=()
+_kit_validate_shell_identifier() {
+    local name="$1"
+    # Valid shell identifiers: start with letter or underscore, followed by alphanumeric/underscore
+    [[ "$name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]
+}
+
+_kit_validate_path() {
+    local path="$1"
+    local expanded_path="${path/\\~/$HOME}"
+
+    # Check for path traversal attempts
+    if [[ "$path" == *"../"* ]] || [[ "$path" == *"/.."* ]] || [[ "$path" == "~"* ]]; then
+        return 1
+    fi
+
+    # Expand and check if path exists (or could exist)
+    # We don't require existence here since paths may be created later
+    # But we do want to catch obviously malicious patterns
+    if [[ "$path" == *'$'* ]] || [[ "$path" == *'`'* ]] || [[ "$path" == *'$('* ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
 _kit_generate_shortcuts() {
     local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
     local auto_generate="${KIT_AUTO_SHORTCUTS:-true}"
@@ -51,15 +76,27 @@ _kit_generate_shortcuts() {
     [[ ! -f "$shortcuts_file" ]] && return 0
 
     local conflicts=0
-    local duplicates=()
 
     while IFS='|' read -r name shortcut_path desc; do
         [[ "$name" =~ ^# ]] && continue
         [[ -z "$name" ]] && continue
 
+        # Validate shortcut name is a safe shell identifier
+        if ! _kit_validate_shell_identifier "$name"; then
+            echo "❌ Error: Invalid shortcut name '$name' in shortcuts.conf. Must be a valid shell identifier (letters, digits, underscore, not starting with digit)." >&2
+            conflicts=$((conflicts + 1))
+            continue
+        fi
+
+        # Validate path is safe (no traversal or command injection)
+        if ! _kit_validate_path "$shortcut_path"; then
+            echo "❌ Error: Invalid path '$shortcut_path' for shortcut '$name'. Path contains unsafe characters." >&2
+            conflicts=$((conflicts + 1))
+            continue
+        fi
+
         if [[ " ${KIT_NAV_ALIASES[*]} " == *" $name "* ]]; then
             echo "❌ Error: Duplicate shortcut '$name' in shortcuts.conf" >&2
-            duplicates+=("$name")
             conflicts=$((conflicts + 1))
             continue
         fi
@@ -86,6 +123,19 @@ _kit_generate_shortcuts
 # ============================================================================
 
 KIT_EDITOR_ALIASES=()
+_kit_validate_editor_command() {
+    local cmd="$1"
+    # Basic validation: editor commands should only contain safe characters
+    # Allow: alphanumeric, spaces, tabs, slashes, dashes, dots, underscores, quotes
+    # Reject: command substitution, variable expansion, pipes, redirects, backticks
+    if [[ "$cmd" == *'`'* ]] || [[ "$cmd" == *'$('* ]] || [[ "$cmd" == *'|'* ]] || \
+       [[ "$cmd" == *'>'* ]] || [[ "$cmd" == *'<'* ]] || [[ "$cmd" == *'&&'* ]] || \
+       [[ "$cmd" == *';'* ]]; then
+        return 1
+    fi
+    return 0
+}
+
 _kit_generate_editors() {
     local editors_file="$KIT_EXT_DIR/editor.conf"
     local auto_generate="${KIT_AUTO_EDITORS:-true}"
@@ -94,15 +144,27 @@ _kit_generate_editors() {
     [[ ! -f "$editors_file" ]] && return 0
 
     local conflicts=0
-    local duplicates=()
 
     while IFS='|' read -r name editor_cmd desc; do
         [[ "$name" =~ ^# ]] && continue
         [[ -z "$name" ]] && continue
 
+        # Validate editor name is a safe shell identifier
+        if ! _kit_validate_shell_identifier "$name"; then
+            echo "❌ Error: Invalid editor name '$name' in editor.conf. Must be a valid shell identifier (letters, digits, underscore, not starting with digit)." >&2
+            conflicts=$((conflicts + 1))
+            continue
+        fi
+
+        # Validate editor command is safe
+        if ! _kit_validate_editor_command "$editor_cmd"; then
+            echo "❌ Error: Invalid editor command for '$name'. Command contains unsafe characters." >&2
+            conflicts=$((conflicts + 1))
+            continue
+        fi
+
         if [[ " ${KIT_EDITOR_ALIASES[*]} " == *" $name "* ]]; then
             echo "❌ Error: Duplicate editor '$name' in editor.conf" >&2
-            duplicates+=("$name")
             conflicts=$((conflicts + 1))
             continue
         fi
