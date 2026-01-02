@@ -503,8 +503,8 @@ If you prefer to uninstall manually:
 
 ```bash
 # 1. Remove Kit configuration from ~/.zshrc
-# Remove these lines:
-#   # Kit V2 - Shell Toolkit
+# Remove these lines (version number may vary):
+#   # Kit X.Y.Z - Shell Toolkit
 #   export KIT_EXT_DIR="..."
 #   source "$KIT_EXT_DIR/loader.zsh"
 
