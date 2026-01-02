@@ -140,9 +140,11 @@ Options:
   -q, --quality NUM    Quality (default: 80)
   -o, --output FILE    Output file
   -v, --verbose        Verbose mode
+  -f, --force          Overwrite output file if it exists
 Examples:
   kit function-with-options input.txt
   kit function-with-options -q 95 -o output.txt input.txt
+  kit function-with-options input.txt --force
 EOF
         return 0
     fi
@@ -150,6 +152,7 @@ EOF
     local quality=80
     local output=""
     local verbose=false
+    local force=false
     local input=""
 
     while [[ $# -gt 0 ]]; do
@@ -166,6 +169,10 @@ EOF
                 verbose=true
                 shift
                 ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
             *)
                 input="$1"
                 shift
@@ -175,8 +182,27 @@ EOF
 
     [[ -z "$input" ]] && { echo "Error: Missing input" >&2; return 2; }
 
-    # Use options in processing
+    # Determine output file
+    local output_file="${output:-${input%.*}_processed.${input##*.}}"
+
+    # Check if output exists (with force flag support)
+    if [[ -f "$output_file" ]]; then
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output_file'" >&2
+            rm -f "$output_file"
+        else
+            echo "Error: Output file '$output_file' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
+    fi
+
+    # Use options in processing (with safer error handling)
     $verbose && echo "Quality: $quality"
+
+    if ! process_command "$input" "$output_file"; then
+        echo "Error: Processing failed" >&2
+        return 1
+    fi
 
     echo "✅ Processed with quality=$quality"
 }
@@ -259,6 +285,23 @@ fi
 [[ -f "$file" ]] || { echo "Error: File not found" >&2; return 1; }
 ```
 
+### Safer Command Execution (Recommended)
+
+```bash
+# GOOD - Direct negation, exit code tied to command
+if ! operation_command "$input" "$output"; then
+    echo "Error: Operation failed" >&2
+    return 1
+fi
+
+# BAD - Fragile, using $? can break if code is added
+operation_command "$input" "$output"
+if [[ $? -ne 0 ]]; then
+    echo "Error: Operation failed" >&2
+    return 1
+fi
+```
+
 ### Error with Cleanup
 
 ```bash
@@ -290,6 +333,21 @@ elif [[ ! -f "$input" ]]; then
 elif [[ ! -w "$(dirname "$output")" ]]; then
     echo "Error: Output directory not writable" >&2
     return 1
+fi
+```
+
+### Output File Exists Check (with --force support)
+
+```bash
+# Check if output file exists
+if [[ -f "$output" ]]; then
+    if [[ "$force" == true ]]; then
+        echo "Warning: Overwriting existing file '$output'" >&2
+        rm -f "$output"
+    else
+        echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+        return 1
+    fi
 fi
 ```
 
@@ -580,6 +638,9 @@ printf "\n"
 8. **Test thoroughly** before considering complete
 9. **Document with examples** in help text
 10. **Follow naming conventions** (lowercase-with-hyphens)
+11. **Warn before destructive operations** (use `--force` flag with warning)
+12. **Use safer error handling** (`if ! command` instead of `$?`)
+13. **Sanitize user input** (reject shell metacharacters in filenames/paths)
 
 ---
 

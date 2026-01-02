@@ -430,12 +430,15 @@ Usage: kit process-with-options [options] <input>
 Options:
   -q, --quality NUM    Quality level (default: 80)
   -o, --output FILE    Output file (default: input + suffix)
+  -f, --force          Overwrite output file if it exists
 EOF
         return 0
     fi
 
     local quality=80
     local output=""
+    local force=false
+    local input=""
 
     # Parse options
     while [[ $# -gt 0 ]]; do
@@ -448,8 +451,12 @@ EOF
                 output="$2"
                 shift 2
                 ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
             *)
-                local input="$1"
+                input="$1"
                 shift
                 ;;
         esac
@@ -457,10 +464,32 @@ EOF
 
     [[ -z "$input" ]] && { echo "Error: Missing input" >&2; return 2; }
 
-    # Process with options
+    # Handle output file with force flag
+    local output_file="${output:-${input%.*}_processed.${input##*.}}"
+    if [[ -f "$output_file" ]]; then
+        if [[ "$force" == true ]]; then
+            echo "Warning: Overwriting existing file '$output_file'" >&2
+            rm -f "$output_file"
+        else
+            echo "Error: Output file '$output_file' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
+    fi
+
+    # Process with options (using safer error handling pattern)
+    if ! process_command "$input" "$output_file"; then
+        echo "Error: Processing failed" >&2
+        return 1
+    fi
+
     echo "✅ Processed with quality=$quality"
 }
 ```
+
+**Important Patterns:**
+- **`--force` flag**: Warn before overwriting existing files
+- **Safer error handling**: Use `if ! command` instead of `command; if [[ $? -ne 0 ]]`
+- **Parse arguments first**, validate after (prevents errors with missing required args)
 
 ### Cross-Platform Compatibility
 
@@ -620,6 +649,96 @@ Before considering the function complete:
 - [ ] All test cases pass
 - [ ] Works with files containing spaces/special chars
 - [ ] **Documentation updated** (README.md for new functions, help block always)
+- [ ] **Input sanitization** (reject metacharacters in filenames/paths)
+- [ ] **Safe error handling** (use `if ! command` not `$?`)
+- [ ] **Force flag warning** (warn before overwriting if `--force` used)
+
+## Security Best Practices
+
+**Critical Security Patterns:**
+
+1. **Input Validation - Sanitize User Input**
+   ```bash
+   # Reject shell metacharacters in filenames/paths
+   if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
+       echo "Error: Filename contains invalid characters" >&2
+       return 1
+   fi
+
+   # Validate numeric inputs (prevent leading zeros for octal issues)
+   if [[ ! "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1 ]] || [[ "$port" -gt 65535 ]]; then
+       echo "Error: Port must be 1-65535" >&2
+       return 2
+   fi
+   ```
+
+2. **Safe Command Execution - Use Arrays for Complex Commands**
+   ```bash
+   # GOOD - Use array to prevent injection
+   local -a cmd=(ffmpeg -i "$input" -c:v libx264 -crf "$crf" "$output")
+   "${cmd[@]}"
+
+   # BAD - String concatenation is vulnerable
+   local cmd="ffmpeg -i $input -c:v libx264 -crf $crf $output"
+   eval "$cmd"  # NEVER use eval with user input
+   ```
+
+3. **Error Handling - Use `if ! command` Pattern**
+   ```bash
+   # GOOD - Reliable exit code checking
+   if ! ffmpeg "${cmd[@]}" 2>/dev/null; then
+       echo "Error: Processing failed" >&2
+       return 1
+   fi
+
+   # BAD - Fragile, can break if code is added
+   ffmpeg "${cmd[@]}" 2>/dev/null
+   if [[ $? -ne 0 ]]; then
+       echo "Error: Processing failed" >&2
+       return 1
+   fi
+   ```
+
+4. **Path Validation - Prevent Traversal**
+   ```bash
+   # Check for path traversal attempts
+   if [[ "$path" == *"../"* ]] || [[ "$path" == *"/.."* ]]; then
+       echo "Error: Path contains traversal sequences" >&2
+       return 1
+   fi
+
+   # Allow ~/ for home directory but reject ~user
+   if [[ "$path" == "~" ]] || [[ "$path" == "~/"* ]]; then
+       if [[ "$path" != "~/"* ]]; then
+           echo "Error: Invalid home directory path" >&2
+           return 1
+       fi
+   fi
+   ```
+
+5. **Shell Identifier Validation**
+   ```bash
+   # Validate function/variable names
+   _kit_validate_shell_identifier() {
+       local name="$1"
+       # Valid: start with letter/underscore, then alphanumeric/underscore
+       [[ "$name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]
+   }
+   ```
+
+6. **Warning Before Destructive Operations**
+   ```bash
+   # Check if output exists and warn before overwrite
+   if [[ -f "$output" ]]; then
+       if [[ "$force" == true ]]; then
+           echo "Warning: Overwriting existing file '$output'" >&2
+           rm -f "$output"
+       else
+           echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+           return 1
+       fi
+   fi
+   ```
 
 ## Best Practices
 
@@ -633,6 +752,8 @@ Before considering the function complete:
 8. **Confirm success** - Tell user what happened
 9. **Use consistent patterns** - Follow existing function style
 10. **Think about users** - Make help text useful
+11. **Warn before destruction** - Use `--force` with warning for overwrites
+12. **Use safe command execution** - Arrays instead of eval, `if !` instead of `$?`
 
 ## Quick Reference
 
