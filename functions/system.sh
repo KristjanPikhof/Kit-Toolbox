@@ -2,7 +2,7 @@
 # Category: System Utilities
 # Description: Shell and filesystem utilities
 # Dependencies: none (Zed editor for zed function)
-# Functions: mklink, zed, killports, uninstall
+# Functions: mklink, zed, killports, uninstall, update
 
 # Detect the operating system
 _kit_detect_os() {
@@ -402,4 +402,125 @@ EOF
     echo "Your backup is saved at: $backup"
 
     return 0
+}
+
+# Update Kit's Toolkit to the latest version
+update() {
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        cat << EOF
+Usage: kit update [--check-only]
+Description: Update Kit's Toolkit to the latest version
+Options:
+  --check-only    Only check for updates, don't install
+Examples:
+  kit update           # Check for updates and install if available
+  kit update --check-only  # Only check, don't install
+EOF
+        return 0
+    fi
+
+    local check_only=false
+    if [[ "$1" == "--check-only" ]]; then
+        check_only=true
+    fi
+
+    # Check if KIT_EXT_DIR is set
+    if [[ -z "$KIT_EXT_DIR" ]]; then
+        echo "Error: KIT_EXT_DIR not found. Kit installation not detected." >&2
+        return 1
+    fi
+
+    # Check if KIT_EXT_DIR is a git repository
+    if [[ ! -d "$KIT_EXT_DIR/.git" ]]; then
+        echo "Error: Kit installation is not a git repository." >&2
+        echo "Your Kit installation may have been downloaded as a zip file." >&2
+        echo "To update, please re-clone or download the latest version from:" >&2
+        echo "  https://github.com/kristjanpikhof/kit-toolbox" >&2
+        return 1
+    fi
+
+    # Check if git is available
+    if ! command -v git &> /dev/null; then
+        echo "Error: git is not installed." >&2
+        echo "Please install git to use the update command." >&2
+        return 1
+    fi
+
+    # Read current version
+    local current_version="unknown"
+    if [[ -f "$KIT_EXT_DIR/VERSION" ]]; then
+        current_version="$(cat "$KIT_EXT_DIR/VERSION" | tr -d '[:space:]')"
+    fi
+
+    echo "Kit's Toolkit"
+    echo "Current version: ${current_version}"
+    echo ""
+
+    # Save current branch
+    cd "$KIT_EXT_DIR" || return 1
+    local current_branch="$(git branch --show-current 2>/dev/null || echo "HEAD")"
+
+    echo "Checking for updates..."
+    # Fetch latest changes without checking them out
+    git fetch -q origin 2>/dev/null
+
+    if [[ $? -ne 0 ]]; then
+        echo "Warning: Could not fetch updates. Check your internet connection." >&2
+        return 1
+    fi
+
+    # Get local and remote commit hashes
+    local local_commit="$(git rev-parse HEAD 2>/dev/null)"
+    local remote_commit="$(git rev-parse @{u} 2>/dev/null)"
+
+    if [[ "$local_commit" == "$remote_commit" ]]; then
+        echo "Already up to date!"
+        return 0
+    fi
+
+    # Get remote version
+    local remote_version="unknown"
+    git show origin/${current_branch}:VERSION 2>/dev/null > /dev/null && \
+        remote_version="$(git show origin/${current_branch}:VERSION 2>/dev/null | tr -d '[:space:]')"
+
+    echo "Update available: ${remote_version}"
+    echo ""
+
+    if [[ "$check_only" == true ]]; then
+        echo "Run 'kit update' to install the update."
+        return 0
+    fi
+
+    # Ask for confirmation
+    read "response?Update to version ${remote_version}? (Y/n): "
+    if [[ "$response" =~ ^[Nn]$ ]]; then
+        echo "Update cancelled."
+        return 0
+    fi
+
+    echo ""
+    echo "Updating..."
+
+    # Pull latest changes
+    if git pull -q; then
+        echo "Successfully updated to version ${remote_version}"
+
+        # Check if VERSION changed
+        if [[ "$current_version" != "$remote_version" ]]; then
+            echo ""
+            echo "A new version (${remote_version}) is installed."
+            echo ""
+            echo "To complete the update, reload your shell:"
+            echo "  1. Open a new terminal window, or"
+            echo "  2. Run: source ~/.zshrc"
+            echo ""
+            echo "Or restart your terminal."
+        fi
+
+        return 0
+    else
+        echo "Error: Update failed." >&2
+        echo "You may need to resolve merge conflicts or network issues." >&2
+        return 1
+    fi
 }

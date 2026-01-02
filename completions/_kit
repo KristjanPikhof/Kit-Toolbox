@@ -165,6 +165,13 @@ case "$CURRENT" in
                     _files
                 fi
                 ;;
+            update)
+                if [[ $CURRENT -eq 3 ]]; then
+                    _values 'update options' '--check-only'
+                else
+                    _files
+                fi
+                ;;
             *)
                 _files
                 ;;
