@@ -107,8 +107,8 @@ EOF
             continue
         fi
 
-        # Check for leading zeros to prevent octal interpretation (e.g., 0108 = 88)
-        # Port 0 is invalid anyway (range is 1-65535), so we reject all leading zeros
+        # Check for leading zeros to prevent octal interpretation (e.g., 0108 = 88 in octal)
+        # We reject ALL leading zeros including single "0" since valid port range is 1-65535
         if [[ "$port" =~ ^0[0-9]+$ ]]; then
             echo "Error: Port '$port' has leading zeros. Use decimal notation without leading zeros (valid range: 1-65535)." >&2
             failed_count=$((failed_count + 1))
