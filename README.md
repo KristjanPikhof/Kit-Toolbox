@@ -163,6 +163,7 @@ Shell and filesystem tools:
 - **zed** — Open files in Zed editor (cross-platform)
 - **killports** — Kill processes using specified network ports
 - **uninstall** — Remove Kit's Toolkit configuration from your shell
+- **update** — Update Kit's Toolkit to the latest version
 
 ### 📦 Dependencies
 Cross-platform dependency management:
@@ -473,6 +474,32 @@ source $KIT_EXT_DIR/loader.zsh
 ### Pre-existing aliases conflict
 If you see "defining function based on alias" errors, remove the old alias definitions from your `.zshrc` and use the function versions instead via the loader.
 
+## Updating Kit
+
+If you installed Kit via git clone, you can update to the latest version using the built-in update command:
+
+```bash
+# Check for and install updates
+kit update
+
+# Check for updates without installing
+kit update --check-only
+```
+
+The update command will:
+- Fetch the latest changes from the git repository
+- Compare your current version with the remote version
+- Ask for confirmation before updating
+- Reload the shell after update if needed
+
+**Requirements:**
+- Kit must be installed via git (not zip download)
+- Git must be installed on your system
+- Internet connection to fetch updates
+
+If you installed Kit via zip download or don't have git, you can update manually by re-downloading from:
+https://github.com/kristjanpikhof/kit-toolbox
+
 ## Uninstallation
 
 To uninstall Kit, use the built-in uninstall command:
@@ -664,7 +691,7 @@ Use freely. Modify as needed.
 
 ## Version
 
-**v2.3.0** — Uninstall command & documentation improvements
+**v2.3.0** — Uninstall, update, & VERSION file
 
 ### Changelog
 - **v2.3.0** (2026-01-02)
@@ -672,9 +699,13 @@ Use freely. Modify as needed.
   - 🗑️ Added `--purge` option to also delete the kit-toolkit directory
   - 🔒 Automatic backup creation before uninstalling
   - 📁 Supports `ZDOTDIR` for custom zsh config locations
+  - 🆕 Added `update` command - update Kit via git to the latest version
+  - 📦 Added `VERSION` file as single source of truth for version
+  - 🔧 Version now injected into zshrc as `# Kit X.Y.Z - Shell Toolkit`
+  - 🔧 Install/uninstall now version-agnostic, supports any future version
   - 📝 Updated README with clear "Zsh Only" requirement documentation
-  - 📝 Updated README with uninstall command documentation
-  - 🔧 Improved tab completion for `uninstall --purge`
+  - 📝 Updated README with uninstall and update command documentation
+  - 🔧 Improved tab completion for `uninstall --purge` and `update --check-only`
 - **v2.2.0** (2026-01-02)
   - 📦 Added `deps-install` command - cross-platform dependency installer
   - 📦 Added `deps-check` command - check status of all dependencies
