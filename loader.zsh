@@ -51,23 +51,25 @@ _kit_validate_shell_identifier() {
 
 _kit_validate_path() {
     local path="$1"
-    local expanded_path="${path/\\~/$HOME}"
 
     # Check for path traversal attempts
     if [[ "$path" == *"../"* ]] || [[ "$path" == *"/.."* ]]; then
         return 1
     fi
 
-    # Allow ~/ prefix for home directory, but reject bare ~ or ~user patterns
-    if [[ "$path" == "~" ]] || [[ "$path" == "~/"* ]] || [[ "$path" == "~"* ]]; then
+    # Allow ~/ prefix for home directory with subpath, reject bare ~ or ~user
+    if [[ "$path" == "~" ]] || [[ "$path" == "~/"* ]]; then
         # Only allow ~/... (home directory with subpath)
         if [[ "$path" != "~/"* ]]; then
-            # Reject bare ~ or ~user
+            # Reject bare ~
             return 1
         fi
+    elif [[ "$path" == "~"* ]]; then
+        # Reject ~user patterns (e.g., ~otheruser/path)
+        return 1
     fi
 
-    # Expand and check if path exists (or could exist)
+    # Reject shell expansion patterns that could enable command injection
     # We don't require existence here since paths may be created later
     # But we do want to catch obviously malicious patterns
     if [[ "$path" == *'$'* ]] || [[ "$path" == *'`'* ]] || [[ "$path" == *'$('* ]]; then
