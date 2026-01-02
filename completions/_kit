@@ -158,6 +158,20 @@ case "$CURRENT" in
             killports)
                 _files
                 ;;
+            uninstall)
+                if [[ $CURRENT -eq 3 ]]; then
+                    _values 'uninstall options' '--purge'
+                else
+                    _files
+                fi
+                ;;
+            update)
+                if [[ $CURRENT -eq 3 ]]; then
+                    _values 'update options' '--check-only'
+                else
+                    _files
+                fi
+                ;;
             *)
                 _files
                 ;;

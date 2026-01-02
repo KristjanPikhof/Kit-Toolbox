@@ -1,8 +1,17 @@
 #!/usr/bin/env zsh
-# Kit's Toolkit v2.0 - Installation Script
+# Kit's Toolkit Installation Script
 # Installs kit-toolkit and configures your shell
 
 set -e
+
+# Read version from VERSION file
+SCRIPT_DIR="${0:A:h}"
+VERSION_FILE="$SCRIPT_DIR/VERSION"
+if [[ -f "$VERSION_FILE" ]]; then
+    KIT_VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
+else
+    KIT_VERSION="unknown"
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -18,12 +27,11 @@ print_warning() { echo "${YELLOW}⚠${NC} $1"; }
 print_info() { echo "${BLUE}ℹ${NC} $1"; }
 
 # Get the directory where this script is located
-SCRIPT_DIR="${0:A:h}"
 KIT_DIR="$SCRIPT_DIR"
 
 echo ""
 echo "╔═══════════════════════════════════════╗"
-echo "║  Kit's Toolkit v2.0 - Installation   ║"
+echo "║  Kit's Toolkit $KIT_VERSION - Installation ║"
 echo "╚═══════════════════════════════════════╝"
 echo ""
 
@@ -68,18 +76,23 @@ fi
 echo ""
 print_info "Adding Kit configuration to .zshrc..."
 
-# Remove old kit configuration if exists
-if grep -q "# Kit V2" "$ZSHRC" 2>/dev/null; then
-    # Create temp file without old kit config
-    sed '/# Kit V2/,/source.*loader\.zsh/d' "$ZSHRC" > "$ZSHRC.tmp"
+# Remove old kit configuration if exists (version-agnostic)
+# Matches any "# Kit <version> - Shell Toolkit" marker
+if grep -q "# Kit.*- Shell Toolkit" "$ZSHRC" 2>/dev/null; then
+    # Use awk for cross-platform compatibility
+    awk '
+        /# Kit.*- Shell Toolkit/ { in_kit_block = 1; next }
+        in_kit_block && /loader\.zsh/ { in_kit_block = 0; next }
+        !in_kit_block { print }
+    ' "$ZSHRC" > "$ZSHRC.tmp"
     mv "$ZSHRC.tmp" "$ZSHRC"
     print_info "Removed old Kit configuration"
 fi
 
-# Add new configuration
+# Add new configuration with version from VERSION file
 cat >> "$ZSHRC" << EOF
 
-# Kit V2 - Shell Toolkit
+# Kit ${KIT_VERSION} - Shell Toolkit
 export KIT_EXT_DIR="$KIT_DIR"
 source "\$KIT_EXT_DIR/loader.zsh"
 EOF
