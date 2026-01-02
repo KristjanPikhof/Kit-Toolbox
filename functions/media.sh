@@ -225,19 +225,49 @@ EOF
         output="${input%.*}_compressed.mp4"
     fi
 
-    local vf_filter=""
+    # Validate CRF value (must be numeric, 0-51)
+    if ! [[ "$crf" =~ ^[0-9]+$ ]] || [[ "$crf" -lt 0 ]] || [[ "$crf" -gt 51 ]]; then
+        echo "Error: Invalid CRF value '$crf'. Must be between 0 and 51." >&2
+        return 2
+    fi
+
+    # Validate preset (must be one of the allowed values)
+    local valid_presets=(ultrafast superfast veryfast faster fast medium slow slower veryslow)
+    local preset_valid=false
+    for p in "${valid_presets[@]}"; do
+        if [[ "$preset" == "$p" ]]; then
+            preset_valid=true
+            break
+        fi
+    done
+    if [[ "$preset_valid" == false ]]; then
+        echo "Error: Invalid preset '$preset'. Must be one of: ${valid_presets[*]}" >&2
+        return 2
+    fi
+
+    # Validate width (must be -1 or positive integer)
+    if [[ "$width" != "-1" ]] && ! [[ "$width" =~ ^[0-9]+$ ]]; then
+        echo "Error: Invalid width '$width'. Must be -1 or a positive integer." >&2
+        return 2
+    fi
+
+    # Build ffmpeg command as array for safe execution
+    local -a ffmpeg_cmd=(ffmpeg -i "$input" -c:v libx264 -crf "$crf" -preset "$preset" -c:a aac -b:a "$bitrate")
+
     if [[ "$width" != "-1" ]]; then
-        vf_filter="-vf \"scale=$width:-1\""
+        ffmpeg_cmd+=(-vf "scale=$width:-1")
     fi
 
-    local ffmpeg_output="/dev/null"
+    ffmpeg_cmd+=(-movflags +faststart "$output")
+
+    # Handle output redirection
     if [[ "$verbose" == true ]]; then
-        ffmpeg_output="/dev/stderr"
+        ffmpeg "${ffmpeg_cmd[@]}"
+    else
+        ffmpeg "${ffmpeg_cmd[@]}" 2>/dev/null
     fi
 
-    local ffmpeg_cmd="ffmpeg -i \"$input\" -c:v libx264 -crf $crf -preset $preset -c:a aac -b:a $bitrate $vf_filter -movflags +faststart \"$output\" 2>$ffmpeg_output"
-
-    if ! eval "$ffmpeg_cmd"; then
+    if [[ $? -ne 0 ]]; then
         echo "Error: Failed to compress video file '$input'" >&2
         return 1
     fi
