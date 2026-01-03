@@ -264,7 +264,48 @@ kit function-name file-with-spaces.txt
 kit function-name "file with special chars !@#.txt"
 ```
 
-### Phase 8: Update Completions (Automatic - No Action Needed)
+### Phase 8: Run Test Suite
+
+After manual testing, run the comprehensive test suite to ensure nothing is broken:
+
+```bash
+cd $KIT_EXT_DIR/tests
+./run-tests.sh
+```
+
+The test suite:
+- Validates all 39+ existing tests still pass
+- Checks dependencies are installed
+- Auto-generates test assets (images, videos)
+- Tests using the same `kit <command>` format users use
+- Downloads real YouTube video for media processing validation
+- Shows detailed results for any failures
+
+**If tests fail:**
+1. Check if your changes affected existing functionality
+2. Review the test output for specific failure details
+3. Fix issues and re-run tests
+
+**Add tests for your new function:**
+Edit `tests/run-tests.sh` and add:
+1. Help test: `run_test "my-function: help works" "kit my-function -h"`
+2. Functional test: Test with actual test assets if applicable
+
+```bash
+# Example test additions to tests/run-tests.sh
+# Help test (always add this)
+run_test "my-function: help works" "kit my-function -h"
+
+# Functional test (if function processes files)
+cd "$ASSETS_DIR"
+run_test "my-function: functional test" \
+    "kit my-function test_input.txt && [[ -f 'expected_output.txt' ]]"
+cd - >/dev/null
+```
+
+See [tests/README.md](tests/README.md) for complete test documentation.
+
+### Phase 9: Update Completions (Automatic - No Action Needed)
 
 **The completion system is FULLY DYNAMIC!**
 
@@ -308,7 +349,7 @@ _kit_get_custom_completion() {
 ./scripts/generate-completions.sh
 ```
 
-### Phase 9: Update Documentation (REQUIRED)
+### Phase 10: Update Documentation (REQUIRED)
 
 **Documentation updates are MANDATORY for every new or modified function.**
 
@@ -318,12 +359,22 @@ After creating or modifying a function, you MUST update:
    - Ensure function is listed in `# Functions:` line
    - Verify dependencies are listed
 
-2. **README.md** (if adding new functions)
+2. **tests/run-tests.sh** (REQUIRED for new functions)
+   - Add help test: `run_test "my-function: help works" "kit my-function -h"`
+   - Add functional test if applicable (see examples in Phase 8)
+   - Place tests in the appropriate section (images, media, system, etc.)
+
+3. **README.md** (REQUIRED for new features)
    - Add function to the appropriate category section
    - Include brief description and usage example
    - Location: Look for sections like "## Available Functions" → "### 📷 Image Processing"
 
-3. **Function Help Block** (Already done in Phase 4)
+4. **VERSION** (REQUIRED for new features)
+   - Increment version number for new features or breaking changes
+   - Format: `X.Y.Z` (major.minor.patch)
+   - Run: `echo "X.Y.Z" > $KIT_EXT_DIR/VERSION`
+
+5. **Function Help Block** (Already done in Phase 4)
    - Ensure `-h` and `--help` show clear usage
    - Include examples in help text
 

@@ -459,7 +459,8 @@ kit() {
 
             local func_list=$(grep "^# Functions:" "$file" | head -1 | cut -d: -f2- | xargs | tr ',' ' ')
 
-            for func in ${=func_list}; do
+            # Use unquoted $func_list for word splitting (works in both bash and zsh)
+            for func in $func_list; do
                 if [[ "$func" == *"$keyword"* ]]; then
                     local category=$(grep "^# Category:" "$file" | head -1 | cut -d: -f2- | xargs)
                     printf "  ${GREEN}%-22s${NC} ${DIM}%s${NC}\n" "$func" "$category"
