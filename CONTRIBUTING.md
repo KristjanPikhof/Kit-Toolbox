@@ -68,6 +68,9 @@ Edit `functions/category.sh` and replace the placeholder with actual implementat
 - [ ] Error messages go to stderr (`echo "..." >&2`)
 - [ ] Success returns exit code 0
 - [ ] Success message explains what was created/modified
+- [ ] **Security:** Input sanitization (reject shell metacharacters in filenames/paths)
+- [ ] **Security:** Use `if ! command` pattern instead of `$?` for error handling
+- [ ] **Security:** Use array-based command building for complex commands (see `kit_pattern.md`)
 
 **Example function structure:**
 
@@ -158,7 +161,31 @@ kit my-function nonexistent.txt  # Should show error and return 1
 kit my-function valid.txt  # Should succeed
 ```
 
-### Step 7: Update Completions (Automatic - No Action Needed)
+### Step 7: Run Test Suite
+
+After your function is implemented and manually tested, run the full test suite to ensure nothing is broken:
+
+```bash
+cd tests
+./run-tests.sh
+```
+
+The test suite:
+- Validates all 39 existing tests still pass
+- Checks dependencies are installed
+- Auto-generates test assets
+- Tests using the same `kit <command>` format users use
+- Shows detailed results for any failures
+
+**If tests fail:**
+1. Check if your changes affected existing functionality
+2. Review the test output for specific failure details
+3. Fix issues and re-run tests
+4. Add new tests for your function if appropriate
+
+See [tests/README.md](tests/README.md) for complete test suite documentation.
+
+### Step 8: Update Completions (Automatic - No Action Needed)
 
 **The completion system is FULLY DYNAMIC!** When you add a new function to a category file, tab completion works automatically after reloading your shell:
 

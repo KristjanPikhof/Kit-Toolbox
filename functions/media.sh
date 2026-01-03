@@ -324,7 +324,7 @@ EOF
     local ffmpeg_output="/dev/null"
     [[ "$verbose" == true ]] && ffmpeg_output="/dev/stderr"
 
-    if ! ffmpeg "${ffmpeg_cmd[@]}" 2>"$ffmpeg_output"; then
+    if ! "${ffmpeg_cmd[@]}" 2>"$ffmpeg_output"; then
         echo "Error: Failed to compress video file '$input'" >&2
         return 1
     fi

@@ -19,6 +19,24 @@ Kit Builder guides you through creating new toolkit functions by:
 - **[examples.md](examples.md)** - Concrete examples of function creation
 - **[reference.md](reference.md)** - Quick reference for common patterns and troubleshooting
 
+## Test Suite Integration
+
+Kit Builder integrates with the comprehensive test suite:
+
+```bash
+# After implementing your function, run tests
+cd $KIT_EXT_DIR/tests
+./run-tests.sh
+```
+
+The test suite validates:
+- All 39+ existing tests still pass
+- Your function works with `kit <command>` format
+- Dependencies are installed
+- File operations work correctly
+
+See [tests/README.md](../../../tests/README.md) for complete test documentation.
+
 ## Quick Start
 
 ### Creating a Simple Function

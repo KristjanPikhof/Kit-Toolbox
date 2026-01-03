@@ -367,6 +367,39 @@ kit compress-video video.mp4 -p veryslow -c 22
 
 ## Development & Extension
 
+### Testing
+
+Kit includes a comprehensive test suite that verifies all functionality:
+
+```bash
+# Run all tests
+cd tests
+./run-tests.sh
+
+# Run with verbose output
+./run-tests.sh -v
+
+# Show help
+./run-tests.sh -h
+```
+
+**Test Coverage:**
+- **39 tests** across all categories
+- Image processing (resize, optimize, convert, thumbnail, rename)
+- Media processing (compress, remove-audio, convert-to-mp3, yt-download)
+- System utilities (mklink, killports, update, uninstall)
+- Core functionality (dispatcher, help, search, categories)
+- File listing (list-files, list-all, list-reverse, list-tree)
+
+The test suite:
+1. Checks dependencies with `kit deps-check`
+2. Auto-generates test assets (images, videos)
+3. Tests all functions using `kit <command>` format
+4. Downloads a real YouTube video for media processing tests
+5. Shows detailed results and offers cleanup
+
+See [tests/README.md](tests/README.md) for complete test documentation.
+
 ### Adding a New Function
 
 1. **Generate template:**
@@ -763,6 +796,7 @@ For very large function sets, the dispatcher uses lazy-loading fallback to avoid
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — Guide for adding new functions (for AI agents and humans)
 - **[llm_prompts/kit_pattern.md](llm_prompts/kit_pattern.md)** — Complete pattern specification
 - **[categories.conf](categories.conf)** — Category registry and descriptions
+- **[tests/README.md](tests/README.md)** — Test suite documentation
 
 ## License
 
@@ -770,17 +804,26 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.4.4** — Comprehensive test suite
 **v2.4.3** — Enhanced image utilities and batch processing
 **v2.4.1** — Dynamic tab completion system
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.4.4** (2026-01-03)
+  - 🧪 Added comprehensive test suite with 39 tests
+  - ✅ Tests all categories: images, media, system, core, file listing
+  - 📦 Auto-generates test assets (images, videos) for testing
+  - 🌐 Downloads real YouTube video for media processing validation
+  - 📖 Added tests/README.md with test suite documentation
 - **v2.4.3** (2026-01-02)
   - 📷 Enhanced `img-rename` with sanitization and sequential modes
   - 🖼️ Added directory target and recursive support (`-r`) to all major image utilities
   - 🔍 Added dry-run mode (`-n`) to image processing functions
   - 🔧 Improved Zsh compatibility and filename sanitization robustness
   - 🐛 Fixed `bad substitution` errors in Zsh and empty filename bugs
+  - 🔒 Security hardening: input validation, path traversal prevention, command injection protection
+  - 📝 Code review completed (see `.context/code-review-2025-01-03.md`)
 - **v2.4.1** (2026-01-02)
   - ⚡ Fully dynamic auto-discovering tab completion system
   - 🔧 No manual regeneration needed - completions discover functions, editors, and shortcuts automatically
