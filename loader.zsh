@@ -43,6 +43,8 @@ fi
 # ============================================================================
 
 KIT_NAV_ALIASES=()
+# Only initialize if not already set (for clean re-source support)
+(( ! ${+KIT_NAV_FUNCTIONS_CREATED} )) && KIT_NAV_FUNCTIONS_CREATED=()
 _kit_validate_shell_identifier() {
     local name="$1"
     # Valid shell identifiers: start with letter or underscore, followed by alphanumeric/underscore
@@ -112,13 +114,27 @@ _kit_generate_shortcuts() {
             continue
         fi
 
+        # Skip if function already exists - handle differently based on origin
         if declare -f "$name" > /dev/null 2>&1; then
-            echo "⚠️  Warning: Shortcut '$name' conflicts with existing function - prefer shortcut behavior" >&2
+            # Use explicit array index check for reliable substring-safe matching
+            if (( ${KIT_NAV_FUNCTIONS_CREATED[(Ie)$name]} )); then
+                # Function was created by kit on previous load - silently redefine to update config changes
+                local escaped_path="${shortcut_path//\'/\\\'}"
+                eval "$name() { local shortcut_name='$name'; local target_path='$escaped_path'; target_path=\"\${target_path/\\~/$HOME}\"; cd \"\$target_path\" && ls; }"
+                KIT_NAV_ALIASES+=("$name")
+                continue
+            fi
+            # User-defined function conflicts with kit shortcut - warn user
+            echo "⚠️  Warning: Shortcut '$name' conflicts with existing function - using existing function" >&2
+            KIT_NAV_ALIASES+=("$name")
+            continue
         fi
 
         local escaped_path="${shortcut_path//\'/\\\'}"
         eval "$name() { local shortcut_name='$name'; local target_path='$escaped_path'; target_path=\"\${target_path/\\~/$HOME}\"; cd \"\$target_path\" && ls; }"
 
+        # Track that this function was created by kit
+        KIT_NAV_FUNCTIONS_CREATED+=("$name")
         KIT_NAV_ALIASES+=("$name")
     done < "$shortcuts_file"
 
@@ -134,6 +150,8 @@ _kit_generate_shortcuts
 # ============================================================================
 
 KIT_EDITOR_ALIASES=()
+# Only initialize if not already set (for clean re-source support)
+(( ! ${+KIT_EDITOR_FUNCTIONS_CREATED} )) && KIT_EDITOR_FUNCTIONS_CREATED=()
 _kit_validate_editor_command() {
     local cmd="$1"
     # Basic validation: editor commands should only contain safe characters
@@ -180,8 +198,46 @@ _kit_generate_editors() {
             continue
         fi
 
+        # Skip if function already exists - handle differently based on origin
         if declare -f "$name" > /dev/null 2>&1; then
-            echo "⚠️  Warning: Editor shortcut '$name' conflicts with existing function - skipping" >&2
+            # Use explicit array index check for reliable substring-safe matching
+            if (( ${KIT_EDITOR_FUNCTIONS_CREATED[(Ie)$name]} )); then
+                # Function was created by kit on previous load - silently redefine to update config changes
+                local escaped_cmd="${editor_cmd//\'/\'\\\'\'}"
+                eval "$name() {
+                    if [[ \"\$1\" == \"-h\" || \"\$1\" == \"--help\" ]]; then
+                        echo \"Usage: kit $name <file|folder>\"
+                        echo \"Description: Open file or folder with $desc\"
+                        echo \"\"
+                        echo \"Examples:\"
+                        echo \"  kit $name myfile.md\"
+                        echo \"  kit $name .\"
+                        return 0
+                    fi
+
+                    if [[ -z \"\$1\" ]]; then
+                        echo \"Error: Missing file or folder path\" >&2
+                        echo \"Usage: kit $name <file|folder>\" >&2
+                        return 2
+                    fi
+
+                    local target=\"\$1\"
+
+                    # Check if target exists (skip for current directory)
+                    if [[ ! -e \"\$target\" && \"\$target\" != \".\" ]]; then
+                        echo \"Error: '\$target' does not exist\" >&2
+                        return 1
+                    fi
+
+                    # Open with the editor
+                    $escaped_cmd \"\$target\"
+                }"
+                KIT_EDITOR_ALIASES+=("$name")
+                continue
+            fi
+            # User-defined function conflicts with kit editor - warn user
+            echo "⚠️  Warning: Editor '$name' conflicts with existing function - using existing function" >&2
+            KIT_EDITOR_ALIASES+=("$name")
             continue
         fi
 
@@ -218,6 +274,8 @@ _kit_generate_editors() {
             $escaped_cmd \"\$target\"
         }"
 
+        # Track that this function was created by kit
+        KIT_EDITOR_FUNCTIONS_CREATED+=("$name")
         KIT_EDITOR_ALIASES+=("$name")
     done < "$editors_file"
 
