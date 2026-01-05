@@ -315,7 +315,7 @@ EOF
     local -a ffmpeg_cmd=(ffmpeg -i "$input" -c:v libx264 -crf "$crf" -preset "$preset" -c:a aac -b:a "$bitrate")
 
     if [[ "$width" != "-1" ]]; then
-        ffmpeg_cmd+=(-vf "scale=$width:-1")
+        ffmpeg_cmd+=(-vf "scale=$width:-2")
     fi
 
     ffmpeg_cmd+=(-movflags +faststart "$output")
