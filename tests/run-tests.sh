@@ -478,6 +478,11 @@ run_test "kit dispatcher: main help works" "kit -h | grep -q Kit"
 run_test "kit --list-categories: lists categories" "kit --list-categories | grep -q Image"
 run_test "kit --search: search functions" "kit --search resize | grep -q img-resize"
 
+# CCFlare tests
+run_test "ccflare: help works" "kit ccflare -h"
+run_test "ccflare: help shows toggle option" "kit ccflare -h | grep -q toggle"
+run_test "ccflare: status command works" "kit ccflare status | grep -q 'CCFlare Status'"
+
 # ============================================================================
 # FILE LISTING TESTS
 # ============================================================================

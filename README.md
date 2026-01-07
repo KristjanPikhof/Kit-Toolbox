@@ -168,8 +168,7 @@ Cross-platform dependency management:
 
 ### 🧭 Navigation Shortcuts
 Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
-- **ccflare-on** — Enable CCFlare proxy
-- **ccflare-off** — Disable CCFlare proxy
+- **ccflare** — Toggle CCFlare proxy on/off (configurable via `ccflare.conf`)
 
 **Auto-generated navigation shortcuts** (configured in `shortcuts.conf`):
 ```bash

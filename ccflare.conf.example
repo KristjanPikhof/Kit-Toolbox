@@ -1,0 +1,101 @@
+# ccflare.conf - CCFlare/Proxy Configuration for Claude Code
+# Format: KEY=value (shell-compatible)
+#
+# Copy this file to ccflare.conf and customize as needed:
+#   cp ccflare.conf.example ccflare.conf
+#
+# Usage:
+#   kit ccflare on      # Enable proxy with these settings
+#   kit ccflare off     # Disable proxy, unset all managed variables
+#   kit ccflare status  # Show current configuration
+#   kit ccflare         # Toggle on/off
+#
+# Settings are loaded dynamically by the ccflare function.
+# All settings are exported as environment variables when enabled.
+
+# ============================================================================
+# Proxy Settings
+# ============================================================================
+
+# Proxy URL - where your proxy/alternative API is running
+# This is set as ANTHROPIC_BASE_URL when ccflare is enabled
+CCFLARE_PROXY_URL=http://localhost:8080
+
+# Default Anthropic API URL (currently unused - off unsets all variables)
+# ANTHROPIC_API_URL=https://api.anthropic.com
+
+# ============================================================================
+# Authentication
+# ============================================================================
+
+# Override ANTHROPIC_AUTH_TOKEN when using proxy
+# For z.ai: use your z.ai API key
+# Leave commented to use existing token from environment
+# ANTHROPIC_AUTH_TOKEN=your-token-here
+
+# ============================================================================
+# Model Configuration
+# ============================================================================
+
+# Override default model when using proxy
+# Leave commented to use Claude Code's default model
+# ANTHROPIC_MODEL=claude-sonnet-4-20250514
+
+# Model Mapping (for alternative providers like z.ai)
+# Map Claude model tiers to alternative models when using proxy
+
+# Opus model mapping (used for complex reasoning tasks)
+# ANTHROPIC_DEFAULT_OPUS_MODEL=GLM-4.7
+
+# Sonnet model mapping (default balanced model)
+# ANTHROPIC_DEFAULT_SONNET_MODEL=GLM-4.7
+
+# Haiku model mapping (fast, lightweight tasks)
+# ANTHROPIC_DEFAULT_HAIKU_MODEL=GLM-4.5-Air
+
+# ============================================================================
+# Timeout Settings
+# ============================================================================
+
+# API timeout in milliseconds (useful for slow providers)
+# Default Claude timeout is usually 60000ms (1 minute)
+# For z.ai or slow models, you may need higher values
+# API_TIMEOUT_MS=3000000
+
+# ============================================================================
+# Additional Environment Variables
+# ============================================================================
+
+# Format: comma-separated key=value pairs for any extra vars
+# CCFLARE_EXTRA_VARS=KEY1=value1,KEY2=value2
+
+# ============================================================================
+# Example Configurations
+# ============================================================================
+#
+# --- Local CCFlare Proxy ---
+# CCFLARE_PROXY_URL=http://localhost:8080
+#
+# --- z.ai Configuration ---
+# CCFLARE_PROXY_URL=https://api.z.ai/api/anthropic
+# ANTHROPIC_AUTH_TOKEN=your_zai_api_key
+# API_TIMEOUT_MS=3000000
+# ANTHROPIC_DEFAULT_OPUS_MODEL=GLM-4.7
+# ANTHROPIC_DEFAULT_SONNET_MODEL=GLM-4.7
+# ANTHROPIC_DEFAULT_HAIKU_MODEL=GLM-4.5-Air
+#
+# --- Alternative: Edit Claude Code settings directly ---
+# Instead of using this config, you can also edit:
+#   ~/.claude/settings.json
+#
+# Add or modify the env fields:
+# {
+#     "env": {
+#         "ANTHROPIC_AUTH_TOKEN": "your_zai_api_key",
+#         "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
+#         "API_TIMEOUT_MS": "3000000"
+#     }
+# }
+#
+# The advantage of using ccflare.conf is you can toggle on/off easily
+# without editing settings.json each time.
