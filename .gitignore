@@ -23,6 +23,7 @@ Thumbs.db
 # User-specific configuration
 shortcuts.conf
 editor.conf
+ccflare.conf
 
 # Backup files
 *.backup
