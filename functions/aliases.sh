@@ -123,7 +123,7 @@ Usage: kit ccflare [on|off|status]
 Description: Toggle CCFlare proxy for Anthropic API calls
 Options:
   on      Enable CCFlare proxy
-  off     Disable CCFlare proxy (restore default API)
+  off     Disable CCFlare proxy (preserves auth token for OAuth session)
   status  Show current CCFlare status
   (none)  Toggle current state
 
@@ -197,8 +197,8 @@ EOF
             ;;
         off)
             # Unset all ccflare-managed variables (restore to Claude defaults)
+            # Note: ANTHROPIC_AUTH_TOKEN is NOT unset to preserve OAuth session
             unset ANTHROPIC_BASE_URL 2>/dev/null
-            unset ANTHROPIC_AUTH_TOKEN 2>/dev/null
             unset ANTHROPIC_MODEL 2>/dev/null
             unset ANTHROPIC_DEFAULT_OPUS_MODEL 2>/dev/null
             unset ANTHROPIC_DEFAULT_SONNET_MODEL 2>/dev/null
