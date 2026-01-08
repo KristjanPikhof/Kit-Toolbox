@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.5.0
+# Kit's Toolkit v2.5.1
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
