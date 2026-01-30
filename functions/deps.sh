@@ -132,6 +132,7 @@ _kit_get_dependencies() {
 imagemagick|command -v magick|imagemagick|ImageMagick v7+ for image processing
 yt-dlp|command -v yt-dlp|yt-dlp|YouTube/media downloader
 ffmpeg|command -v ffmpeg|ffmpeg|Video/audio processing
+qpdf|command -v qpdf|qpdf|PDF transformation and optimization toolkit
 lsd|command -v lsd|lsd|Enhanced file listing
 lsof|command -v lsof|lsof|List open files (for killports)
 EOF

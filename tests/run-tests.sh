@@ -267,6 +267,35 @@ else
     echo -e "${YELLOW}⚠️  ffmpeg not found. Video tests will be limited.${NC}"
 fi
 
+# Generate test PDF
+echo "Generating test PDF..."
+mkdir -p "$ASSETS_DIR/pdf"
+
+if command -v qpdf &>/dev/null; then
+    # Create a simple multi-page PDF using qpdf
+    # First create individual page PDFs, then merge
+    echo "%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >> endobj
+xref
+0 4
+0000000000 65535 f
+0000000009 00000 n
+0000000058 00000 n
+0000000115 00000 n
+trailer << /Size 4 /Root 1 0 R >>
+startxref
+196
+%%EOF" > "$ASSETS_DIR/pdf/page1.pdf"
+    # Duplicate for multi-page test
+    cp "$ASSETS_DIR/pdf/page1.pdf" "$ASSETS_DIR/pdf/page2.pdf"
+    qpdf --empty --pages "$ASSETS_DIR/pdf/page1.pdf" "$ASSETS_DIR/pdf/page2.pdf" -- "$ASSETS_DIR/pdf/test_input.pdf" 2>/dev/null
+    echo -e "${GREEN}✓${NC} Created test PDF"
+else
+    echo -e "${YELLOW}⚠️  qpdf not found. PDF tests will be limited.${NC}"
+fi
+
 echo ""
 echo "Test assets ready in: $ASSETS_DIR"
 
@@ -444,6 +473,45 @@ else
 fi
 
 # ============================================================================
+# PDF PROCESSING TESTS
+# ============================================================================
+
+print_section "PDF Processing Tests"
+
+# Help tests
+run_test "pdf-split: help works" "kit pdf-split -h"
+run_test "pdf-merge: help works" "kit pdf-merge -h"
+run_test "pdf-compress: help works" "kit pdf-compress -h"
+run_test "pdf-rotate: help works" "kit pdf-rotate -h"
+
+# Functional tests
+if [[ -f "$ASSETS_DIR/pdf/test_input.pdf" ]]; then
+    cd "$ASSETS_DIR/pdf"
+
+    # Test pdf-split
+    rm -f "test_split.pdf" 2>/dev/null
+    run_test "pdf-split: functional test" \
+        "kit pdf-split test_input.pdf '1' -o test_split.pdf && [[ -f 'test_split.pdf' ]]"
+
+    # Test pdf-merge
+    rm -f "merged.pdf" 2>/dev/null
+    run_test "pdf-merge: functional test" \
+        "kit pdf-merge page1.pdf page2.pdf -o merged.pdf && [[ -f 'merged.pdf' ]]"
+
+    # Test pdf-compress
+    rm -f "test_input_compressed.pdf" 2>/dev/null
+    run_test "pdf-compress: functional test" \
+        "kit pdf-compress test_input.pdf && [[ -f 'test_input_compressed.pdf' ]]"
+
+    # Test pdf-rotate
+    rm -f "test_input_rotated.pdf" 2>/dev/null
+    run_test "pdf-rotate: functional test" \
+        "kit pdf-rotate test_input.pdf 90 && [[ -f 'test_input_rotated.pdf' ]]"
+
+    cd - >/dev/null
+fi
+
+# ============================================================================
 # SYSTEM UTILITIES TESTS
 # ============================================================================
 
@@ -549,6 +617,13 @@ echo ""
 echo "Video outputs:"
 list_output_files "$ASSETS_DIR/video/*_compressed.mp4"
 list_output_files "$ASSETS_DIR/video/*_noaudio.mp4"
+
+echo ""
+echo "PDF outputs:"
+list_output_files "$ASSETS_DIR/pdf/*_compressed.pdf"
+list_output_files "$ASSETS_DIR/pdf/*_rotated.pdf"
+list_output_files "$ASSETS_DIR/pdf/merged.pdf"
+list_output_files "$ASSETS_DIR/pdf/test_split.pdf"
 
 # ============================================================================
 # CLEANUP PROMPT

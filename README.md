@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.5.1
+# Kit's Toolkit v2.6.0
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -154,6 +154,13 @@ Download and process video/audio:
 - **convert-to-mp3** — Extract audio and convert to MP3
 - **compress-video** — Compress video files for uploads (supports CRF, preset, width, bitrate options)
 
+### 📄 PDF Processing
+Split, merge, compress, and rotate PDF files:
+- **pdf-split** — Extract pages using flexible syntax ("2-20", "1,5,19")
+- **pdf-merge** — Combine multiple PDFs into one
+- **pdf-compress** — Reduce PDF file size
+- **pdf-rotate** — Rotate pages 90°, 180°, or 270°
+
 ### 🖇️ System Utilities
 Shell and filesystem tools:
 - **mklink** — Create symbolic links with validation
@@ -243,6 +250,7 @@ kit-toolkit/
 ├── functions/                # Function modules
 │   ├── images.sh             # Image processing functions
 │   ├── media.sh              # Media processing functions
+│   ├── pdf.sh                # PDF processing functions
 │   ├── system.sh             # System utilities
 │   ├── aliases.sh            # Navigation shortcuts
 │   └── lsd.sh                # File listing utilities
@@ -364,6 +372,28 @@ kit compress-video video.mp4 -p veryslow -c 22
 
 **Note:** Lower CRF = better quality but larger file. The default of 23 is a good balance for most use cases.
 
+#### PDF Processing Examples
+
+```bash
+# Split pages from a PDF
+kit pdf-split document.pdf "1-10"
+kit pdf-split document.pdf "1,3,5,7" -o odd_pages.pdf
+kit pdf-split book.pdf "50-100" --force
+
+# Merge multiple PDFs
+kit pdf-merge part1.pdf part2.pdf part3.pdf
+kit pdf-merge *.pdf -o combined.pdf
+
+# Compress a PDF
+kit pdf-compress large_scan.pdf
+kit pdf-compress report.pdf -o report_small.pdf
+
+# Rotate PDF pages
+kit pdf-rotate scan.pdf 90                    # Rotate all pages
+kit pdf-rotate doc.pdf 180 "1,3"              # Rotate specific pages
+kit pdf-rotate book.pdf 270 "5-10" -o fixed.pdf
+```
+
 ## Development & Extension
 
 ### Testing
@@ -383,16 +413,17 @@ cd tests
 ```
 
 **Test Coverage:**
-- **39 tests** across all categories
+- **47 tests** across all categories
 - Image processing (resize, optimize, convert, thumbnail, rename)
 - Media processing (compress, remove-audio, convert-to-mp3, yt-download)
+- PDF processing (split, merge, compress, rotate)
 - System utilities (mklink, killports, update, uninstall)
 - Core functionality (dispatcher, help, search, categories)
 - File listing (list-files, list-all, list-reverse, list-tree)
 
 The test suite:
 1. Checks dependencies with `kit deps-check`
-2. Auto-generates test assets (images, videos)
+2. Auto-generates test assets (images, videos, PDFs)
 3. Tests all functions using `kit <command>` format
 4. Downloads a real YouTube video for media processing tests
 5. Shows detailed results and offers cleanup
@@ -706,6 +737,7 @@ The toolkit supports **macOS** and **Linux** with the following package managers
 |----------|---|
 | images | **ImageMagick v7+** (with `magick` command) |
 | media | `yt-dlp`, `ffmpeg` |
+| pdf | `qpdf` |
 | system | `lsof` (for killports) |
 | aliases | none |
 | lsd | `lsd` |
@@ -739,6 +771,33 @@ sudo apt install imagemagick
 ```bash
 # Should show 'magick' command available
 magick --version
+```
+
+### Installing qpdf
+
+**macOS:**
+```bash
+brew install qpdf
+```
+
+**Linux:**
+```bash
+# Debian/Ubuntu
+sudo apt install qpdf
+
+# Fedora
+sudo dnf install qpdf
+
+# Arch Linux
+sudo pacman -S qpdf
+
+# openSUSE
+sudo zypper install qpdf
+```
+
+**Verify installation:**
+```bash
+qpdf --version
 ```
 
 ### Installing Other Dependencies
@@ -803,12 +862,21 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.6.0** — PDF processing functions
 **v2.4.4** — Comprehensive test suite
 **v2.4.3** — Enhanced image utilities and batch processing
 **v2.4.1** — Dynamic tab completion system
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.6.0** (2025-01-30)
+  - 📄 Added PDF processing category with 4 functions
+  - 📄 `pdf-split` — Extract page ranges with flexible syntax
+  - 📄 `pdf-merge` — Combine multiple PDFs
+  - 📄 `pdf-compress` — Reduce file size with linearization
+  - 📄 `pdf-rotate` — Rotate pages by 90°, 180°, or 270°
+  - 📦 Added qpdf dependency for PDF processing
+  - 🧪 Added tests for all PDF functions
 - **v2.4.4** (2026-01-03)
   - 🧪 Added comprehensive test suite with 39 tests
   - ✅ Tests all categories: images, media, system, core, file listing
