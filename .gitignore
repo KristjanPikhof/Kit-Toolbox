@@ -54,6 +54,7 @@ tmp/
 
 # Test files
 tests/assets/
+plans/
 
 # Kit files
 shortcuts.conf
