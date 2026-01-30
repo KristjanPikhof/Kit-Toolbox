@@ -75,9 +75,27 @@ EOF
         return 2
     fi
 
+    # Validate pages syntax (numbers, commas, hyphens only)
+    if [[ ! "$pages" =~ ^[0-9,\-]+$ ]]; then
+        echo "Error: Invalid page specification. Use numbers, commas, and hyphens only." >&2
+        return 2
+    fi
+
     # Security: reject shell metacharacters in input
     if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
         echo "Error: Invalid characters in filename" >&2
+        return 2
+    fi
+
+    # Security: reject shell metacharacters in output
+    if [[ -n "$output" && "$output" =~ [\|\&\$\`\'\;\<\>] ]]; then
+        echo "Error: Invalid characters in output filename" >&2
+        return 2
+    fi
+
+    # Check for path traversal attempts
+    if [[ "$input" == *"../"* ]] || [[ "$input" == *"/.."* ]]; then
+        echo "Error: Path contains traversal sequences" >&2
         return 2
     fi
 
@@ -153,12 +171,22 @@ EOF
                 ;;
             -o|--output)
                 output="$2"
+                # Security: reject shell metacharacters in output
+                if [[ "$output" =~ [\|\&\$\`\'\;\<\>] ]]; then
+                    echo "Error: Invalid characters in output filename" >&2
+                    return 2
+                fi
                 shift 2
                 ;;
             *)
                 # Security: reject shell metacharacters
                 if [[ "$1" =~ [\|\&\$\`\'\;\<\>] ]]; then
                     echo "Error: Invalid characters in filename: $1" >&2
+                    return 2
+                fi
+                # Check for path traversal
+                if [[ "$1" == *"../"* ]] || [[ "$1" == *"/.."* ]]; then
+                    echo "Error: Path contains traversal sequences" >&2
                     return 2
                 fi
                 inputs+=("$1")
@@ -257,6 +285,18 @@ EOF
     # Security: reject shell metacharacters
     if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
         echo "Error: Invalid characters in filename" >&2
+        return 2
+    fi
+
+    # Security: reject shell metacharacters in output
+    if [[ -n "$output" && "$output" =~ [\|\&\$\`\'\;\<\>] ]]; then
+        echo "Error: Invalid characters in output filename" >&2
+        return 2
+    fi
+
+    # Check for path traversal attempts
+    if [[ "$input" == *"../"* ]] || [[ "$input" == *"/.."* ]]; then
+        echo "Error: Path contains traversal sequences" >&2
         return 2
     fi
 
@@ -378,9 +418,27 @@ EOF
         return 2
     fi
 
+    # Validate pages syntax if provided (numbers, commas, hyphens only)
+    if [[ -n "$pages" && ! "$pages" =~ ^[0-9,\-]+$ ]]; then
+        echo "Error: Invalid page specification. Use numbers, commas, and hyphens only." >&2
+        return 2
+    fi
+
     # Security: reject shell metacharacters
     if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
         echo "Error: Invalid characters in filename" >&2
+        return 2
+    fi
+
+    # Security: reject shell metacharacters in output
+    if [[ -n "$output" && "$output" =~ [\|\&\$\`\'\;\<\>] ]]; then
+        echo "Error: Invalid characters in output filename" >&2
+        return 2
+    fi
+
+    # Check for path traversal attempts
+    if [[ "$input" == *"../"* ]] || [[ "$input" == *"/.."* ]]; then
+        echo "Error: Path contains traversal sequences" >&2
         return 2
     fi
 
