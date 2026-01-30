@@ -24,6 +24,7 @@ Thumbs.db
 shortcuts.conf
 editor.conf
 ccflare.conf
+CLAUDE.md
 
 # Backup files
 *.backup
