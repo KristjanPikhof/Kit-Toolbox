@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.5.1
+# Kit's Toolkit v2.6.0
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -862,12 +862,21 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.6.0** — PDF processing functions
 **v2.4.4** — Comprehensive test suite
 **v2.4.3** — Enhanced image utilities and batch processing
 **v2.4.1** — Dynamic tab completion system
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.6.0** (2025-01-30)
+  - 📄 Added PDF processing category with 4 functions
+  - 📄 `pdf-split` — Extract page ranges with flexible syntax
+  - 📄 `pdf-merge` — Combine multiple PDFs
+  - 📄 `pdf-compress` — Reduce file size with linearization
+  - 📄 `pdf-rotate` — Rotate pages by 90°, 180°, or 270°
+  - 📦 Added qpdf dependency for PDF processing
+  - 🧪 Added tests for all PDF functions
 - **v2.4.4** (2026-01-03)
   - 🧪 Added comprehensive test suite with 39 tests
   - ✅ Tests all categories: images, media, system, core, file listing
