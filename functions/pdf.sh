@@ -2,7 +2,7 @@
 # Category: PDF Processing
 # Description: Split, merge, compress, and rotate PDF files
 # Dependencies: qpdf
-# Functions: pdf-split, pdf-merge, pdf-compress, pdf-rotate
+# Functions: pdf-split, pdf-merge, pdf-compress, pdf-rotate, pdf-burst
 
 # Helper function to check qpdf and show install instructions
 _kit_check_qpdf() {
@@ -493,4 +493,143 @@ EOF
     else
         echo "Rotated all pages by ${degrees}°: $output"
     fi
+}
+
+pdf-burst() {
+    local force=false
+    local input=""
+    local chunk_size=1
+    local output_pattern=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                cat << EOF
+Usage: kit pdf-burst <input.pdf> [pages_per_file] [-o pattern] [-f|--force]
+Description: Split PDF into multiple files of fixed page count
+Arguments:
+  pages_per_file       Number of pages per output file (default: 1)
+Options:
+  -o, --output PATTERN Output filename pattern (default: input_page_%d.pdf)
+                       %d is replaced by the starting page number
+  -f, --force          Overwrite output files if they exist
+Examples:
+  kit pdf-burst doc.pdf                 # Split into single pages
+  kit pdf-burst doc.pdf 2               # Split into 2-page chunks
+  kit pdf-burst doc.pdf -o "page_%d.pdf" # Custom naming
+EOF
+                return 0
+                ;;
+            -f|--force)
+                force=true
+                shift
+                ;;
+            -o|--output)
+                output_pattern="$2"
+                shift 2
+                ;;
+            *)
+                if [[ -z "$input" ]]; then
+                    input="$1"
+                elif [[ -z "$output_pattern" && "$1" =~ ^[0-9]+$ ]]; then
+                    # Assume second arg is chunk size if it's a number and not following -o
+                    chunk_size="$1"
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    # Input validation
+    if [[ -z "$input" ]]; then
+        echo "Error: Missing input PDF file" >&2
+        return 2
+    fi
+
+    # Validate chunk size
+    if [[ ! "$chunk_size" =~ ^[0-9]+$ ]] || [[ "$chunk_size" -lt 1 ]]; then
+        echo "Error: Pages per file must be a positive integer" >&2
+        return 2
+    fi
+
+    # Security: reject shell metacharacters in input
+    if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
+        echo "Error: Invalid characters in filename" >&2
+        return 2
+    fi
+
+    # Security: reject shell metacharacters in output pattern
+    if [[ -n "$output_pattern" && "$output_pattern" =~ [\|\&\$\`\'\;\<\>] ]]; then
+        echo "Error: Invalid characters in output pattern" >&2
+        return 2
+    fi
+
+    # Check for path traversal attempts
+    if [[ "$input" == *"../"* ]] || [[ "$input" == *"/.."* ]]; then
+        echo "Error: Path contains traversal sequences" >&2
+        return 2
+    fi
+
+    # File check
+    if [[ ! -f "$input" ]]; then
+        echo "Error: File not found: $input" >&2
+        return 1
+    fi
+
+    # Check file extension
+    if [[ "${input##*.}" != "pdf" && "${input##*.}" != "PDF" ]]; then
+        echo "Error: Input file must be a PDF" >&2
+        return 2
+    fi
+
+    # Dependency check
+    if ! _kit_check_qpdf; then
+        return 1
+    fi
+
+    # Generate output pattern if not specified
+    if [[ -z "$output_pattern" ]]; then
+        local basename="${input%.*}"
+        output_pattern="${basename}_page_%d.pdf"
+    fi
+
+    # Ensure pattern contains %d for safety/logic, unless user really knows what they are doing
+    # qpdf requires a pattern to differentiate files
+    if [[ "$output_pattern" != *"%d"* ]]; then
+        echo "Warning: Output pattern missing '%d' placeholder. Appending '_%d.pdf'" >&2
+        output_pattern="${output_pattern%.*}_%d.pdf"
+    fi
+
+    # Pre-flight check: Verify we won't overwrite files (unless forced)
+    if [[ "$force" != true ]]; then
+        local page_count
+        if ! page_count=$(qpdf --show-npages "$input" 2>/dev/null); then
+            echo "Error: Failed to determine page count" >&2
+            return 1
+        fi
+
+        # We only check the first few to avoid massive loops, or check them all?
+        # Checking all is safer.
+        local i
+        for ((i=1; i<=page_count; i+=chunk_size)); do
+            # Format the filename as qpdf would
+            local check_file
+            # printf handles %d substitution
+            printf -v check_file "$output_pattern" "$i"
+            
+            if [[ -f "$check_file" ]]; then
+                echo "Error: Output file '$check_file' already exists. Use --force to overwrite." >&2
+                return 1
+            fi
+        done
+    fi
+
+    # Execute qpdf
+    # Note: --split-pages=N splits into N page chunks
+    if ! qpdf "$input" --split-pages="$chunk_size" "$output_pattern"; then
+        echo "Error: Failed to burst PDF" >&2
+        return 1
+    fi
+
+    echo "Successfully split '$input' into chunks of $chunk_size pages using pattern '$output_pattern'"
 }

@@ -483,6 +483,7 @@ run_test "pdf-split: help works" "kit pdf-split -h"
 run_test "pdf-merge: help works" "kit pdf-merge -h"
 run_test "pdf-compress: help works" "kit pdf-compress -h"
 run_test "pdf-rotate: help works" "kit pdf-rotate -h"
+run_test "pdf-burst: help works" "kit pdf-burst -h"
 
 # Functional tests
 if [[ -f "$ASSETS_DIR/pdf/test_input.pdf" ]]; then
@@ -507,6 +508,11 @@ if [[ -f "$ASSETS_DIR/pdf/test_input.pdf" ]]; then
     rm -f "test_input_rotated.pdf" 2>/dev/null
     run_test "pdf-rotate: functional test" \
         "kit pdf-rotate test_input.pdf 90 && [[ -f 'test_input_rotated.pdf' ]]"
+
+    # Test pdf-burst
+    rm -f "test_input_page_1.pdf" "test_input_page_2.pdf" 2>/dev/null
+    run_test "pdf-burst: functional test" \
+        "kit pdf-burst test_input.pdf && [[ -f 'test_input_page_1.pdf' && -f 'test_input_page_2.pdf' ]]"
 
     cd - >/dev/null
 fi
@@ -622,6 +628,7 @@ echo ""
 echo "PDF outputs:"
 list_output_files "$ASSETS_DIR/pdf/*_compressed.pdf"
 list_output_files "$ASSETS_DIR/pdf/*_rotated.pdf"
+list_output_files "$ASSETS_DIR/pdf/*_page_*.pdf"
 list_output_files "$ASSETS_DIR/pdf/merged.pdf"
 list_output_files "$ASSETS_DIR/pdf/test_split.pdf"
 
