@@ -629,8 +629,9 @@ EOF
     # Pre-flight check: Verify we won't overwrite files (unless forced)
     if [[ "$force" != true ]]; then
         local page_count
-        if ! page_count=$(qpdf --show-npages "$input" 2>/dev/null); then
-            echo "Error: Failed to determine page count" >&2
+        # Run qpdf without suppressing stderr to see potential errors (password, corruption, etc.)
+        if ! page_count=$(qpdf --show-npages "$input"); then
+            echo "Error: Failed to determine page count. qpdf output above." >&2
             return 1
         fi
 
