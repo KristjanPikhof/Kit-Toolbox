@@ -509,10 +509,15 @@ if [[ -f "$ASSETS_DIR/pdf/test_input.pdf" ]]; then
     run_test "pdf-rotate: functional test" \
         "kit pdf-rotate test_input.pdf 90 && [[ -f 'test_input_rotated.pdf' ]]"
 
-    # Test pdf-burst
-    rm -f "test_input_page_1.pdf" "test_input_page_2.pdf" 2>/dev/null
-    run_test "pdf-burst: functional test" \
-        "kit pdf-burst test_input.pdf && [[ -f 'test_input_page_1.pdf' && -f 'test_input_page_2.pdf' ]]"
+    # Test pdf-burst (default directory)
+    rm -rf "test_input_burst" 2>/dev/null
+    run_test "pdf-burst: default directory" \
+        "kit pdf-burst test_input.pdf && [[ -d 'test_input_burst' && -f 'test_input_burst/page_1.pdf' ]]"
+
+    # Test pdf-burst (custom directory)
+    rm -rf "custom_burst" 2>/dev/null
+    run_test "pdf-burst: custom directory" \
+        "kit pdf-burst test_input.pdf -d custom_burst && [[ -d 'custom_burst' && -f 'custom_burst/page_1.pdf' ]]"
 
     cd - >/dev/null
 fi
@@ -628,9 +633,10 @@ echo ""
 echo "PDF outputs:"
 list_output_files "$ASSETS_DIR/pdf/*_compressed.pdf"
 list_output_files "$ASSETS_DIR/pdf/*_rotated.pdf"
-list_output_files "$ASSETS_DIR/pdf/*_page_*.pdf"
 list_output_files "$ASSETS_DIR/pdf/merged.pdf"
 list_output_files "$ASSETS_DIR/pdf/test_split.pdf"
+list_output_files "$ASSETS_DIR/pdf/test_input_burst/*"
+list_output_files "$ASSETS_DIR/pdf/custom_burst/*"
 
 # ============================================================================
 # CLEANUP PROMPT

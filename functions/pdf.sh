@@ -500,23 +500,25 @@ pdf-burst() {
     local input=""
     local chunk_size=1
     local output_pattern=""
+    local output_dir=""
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit pdf-burst <input.pdf> [pages_per_file] [-o pattern] [-f|--force]
+Usage: kit pdf-burst <input.pdf> [pages_per_file] [-o pattern] [-d directory] [-f|--force]
 Description: Split PDF into multiple files of fixed page count
 Arguments:
   pages_per_file       Number of pages per output file (default: 1)
 Options:
-  -o, --output PATTERN Output filename pattern (default: input_page_%d.pdf)
+  -o, --output PATTERN Filename pattern (default: page_%d.pdf)
                        %d is replaced by the starting page number
+  -d, --dir DIR        Output directory (default: input_filename_burst/)
   -f, --force          Overwrite output files if they exist
 Examples:
-  kit pdf-burst doc.pdf                 # Split into single pages
-  kit pdf-burst doc.pdf 2               # Split into 2-page chunks
-  kit pdf-burst doc.pdf -o "page_%d.pdf" # Custom naming
+  kit pdf-burst doc.pdf                 # Split into doc_burst/page_1.pdf...
+  kit pdf-burst doc.pdf 2 -d .          # Split into current directory
+  kit pdf-burst doc.pdf -o "part_%d.pdf" -d split_files/
 EOF
                 return 0
                 ;;
@@ -526,6 +528,10 @@ EOF
                 ;;
             -o|--output)
                 output_pattern="$2"
+                shift 2
+                ;;
+            -d|--dir)
+                output_dir="$2"
                 shift 2
                 ;;
             *)
@@ -564,7 +570,7 @@ EOF
         return 2
     fi
 
-    # Check for path traversal attempts
+    # Check for path traversal attempts in input
     if [[ "$input" == *"../"* ]] || [[ "$input" == *"/.."* ]]; then
         echo "Error: Path contains traversal sequences" >&2
         return 2
@@ -587,17 +593,37 @@ EOF
         return 1
     fi
 
-    # Generate output pattern if not specified
-    if [[ -z "$output_pattern" ]]; then
-        local basename="${input%.*}"
-        output_pattern="${basename}_page_%d.pdf"
+    # Determine output directory
+    if [[ -z "$output_dir" ]]; then
+        local input_basename="${input%.*}"
+        output_dir="${input_basename}_burst"
     fi
 
-    # Ensure pattern contains %d for safety/logic, unless user really knows what they are doing
-    # qpdf requires a pattern to differentiate files
+    # Create output directory if it doesn't exist
+    if [[ ! -d "$output_dir" ]]; then
+        mkdir -p "$output_dir" || { echo "Error: Failed to create output directory '$output_dir'" >&2; return 1; }
+        echo "Created directory: $output_dir"
+    fi
+
+    # Determine full output pattern
+    if [[ -z "$output_pattern" ]]; then
+        # Default filename pattern inside directory
+        output_pattern="page_%d.pdf"
+    fi
+
+    # Ensure pattern contains %d
     if [[ "$output_pattern" != *"%d"* ]]; then
         echo "Warning: Output pattern missing '%d' placeholder. Appending '_%d.pdf'" >&2
         output_pattern="${output_pattern%.*}_%d.pdf"
+    fi
+
+    # Combine directory and pattern
+    # If pattern is absolute path, use as is (unlikely). If relative, prepend dir.
+    # Simple check for starting with /
+    if [[ "$output_pattern" != /* ]]; then
+        local full_path="$output_dir/$output_pattern"
+    else
+        local full_path="$output_pattern"
     fi
 
     # Pre-flight check: Verify we won't overwrite files (unless forced)
@@ -608,14 +634,11 @@ EOF
             return 1
         fi
 
-        # We only check the first few to avoid massive loops, or check them all?
-        # Checking all is safer.
         local i
         for ((i=1; i<=page_count; i+=chunk_size)); do
-            # Format the filename as qpdf would
             local check_file
             # printf handles %d substitution
-            printf -v check_file "$output_pattern" "$i"
+            printf -v check_file "$full_path" "$i"
             
             if [[ -f "$check_file" ]]; then
                 echo "Error: Output file '$check_file' already exists. Use --force to overwrite." >&2
@@ -625,11 +648,10 @@ EOF
     fi
 
     # Execute qpdf
-    # Note: --split-pages=N splits into N page chunks
-    if ! qpdf "$input" --split-pages="$chunk_size" "$output_pattern"; then
+    if ! qpdf "$input" --split-pages="$chunk_size" "$full_path"; then
         echo "Error: Failed to burst PDF" >&2
         return 1
     fi
 
-    echo "Successfully split '$input' into chunks of $chunk_size pages using pattern '$output_pattern'"
+    echo "Successfully split '$input' into chunks of $chunk_size pages in '$output_dir'"
 }
