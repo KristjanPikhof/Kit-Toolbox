@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.6.0
+# Kit's Toolkit v2.7.0
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -157,6 +157,7 @@ Download and process video/audio:
 ### 📄 PDF Processing
 Split, merge, compress, and rotate PDF files:
 - **pdf-split** — Extract pages using flexible syntax ("2-20", "1,5,19")
+- **pdf-burst** — Split PDF into multiple files of fixed page count
 - **pdf-merge** — Combine multiple PDFs into one
 - **pdf-compress** — Reduce PDF file size
 - **pdf-rotate** — Rotate pages 90°, 180°, or 270°
@@ -375,6 +376,12 @@ kit compress-video video.mp4 -p veryslow -c 22
 #### PDF Processing Examples
 
 ```bash
+# Split PDF into multiple files
+# Default: creates "input_burst/" folder with "page_1.pdf", "page_2.pdf"...
+kit pdf-burst document.pdf
+kit pdf-burst document.pdf 2 -d my_folder    # 2 pages per file in custom folder
+kit pdf-burst document.pdf -o "report_%d.pdf" # Custom filename pattern
+
 # Split pages from a PDF
 kit pdf-split document.pdf "1-10"
 kit pdf-split document.pdf "1,3,5,7" -o odd_pages.pdf
@@ -862,6 +869,7 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.7.0** — PDF bursting and enhanced splitting
 **v2.6.0** — PDF processing functions
 **v2.4.4** — Comprehensive test suite
 **v2.4.3** — Enhanced image utilities and batch processing
@@ -869,6 +877,11 @@ Use freely. Modify as needed.
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.7.0** (2026-02-09)
+  - 📄 Added `pdf-burst` — Split PDF into multiple files of fixed page count
+  - 📂 Default behavior creates dedicated subdirectory for burst files
+  - ⚙️ Added `--dir` / `-d` option to specify custom output directory
+  - 🧪 Added tests for pdf-burst functionality
 - **v2.6.0** (2025-01-30)
   - 📄 Added PDF processing category with 4 functions
   - 📄 `pdf-split` — Extract page ranges with flexible syntax
