@@ -230,7 +230,7 @@ EOF
     fi
 
     # Execute qpdf
-    if ! qpdf --empty --pages "${inputs[@]}" -- "$output"; then
+    if ! qpdf --warning-exit-0 --empty --pages "${inputs[@]}" -- "$output"; then
         echo "Error: Failed to merge PDFs" >&2
         return 1
     fi

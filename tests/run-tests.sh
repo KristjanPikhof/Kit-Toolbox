@@ -497,7 +497,7 @@ if [[ -f "$ASSETS_DIR/pdf/test_input.pdf" ]]; then
     # Test pdf-merge
     rm -f "merged.pdf" 2>/dev/null
     run_test "pdf-merge: functional test" \
-        "kit pdf-merge page1.pdf page2.pdf -o merged.pdf && [[ -f 'merged.pdf' ]]"
+        "kit pdf-merge page1.pdf page2.pdf -o merged.pdf --force && [[ -f 'merged.pdf' ]]"
 
     # Test pdf-compress
     rm -f "test_input_compressed.pdf" 2>/dev/null
