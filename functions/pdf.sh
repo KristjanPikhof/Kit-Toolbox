@@ -537,8 +537,8 @@ EOF
             *)
                 if [[ -z "$input" ]]; then
                     input="$1"
-                elif [[ -z "$output_pattern" && "$1" =~ ^[0-9]+$ ]]; then
-                    # Assume second arg is chunk size if it's a number and not following -o
+                elif [[ "$1" =~ ^[0-9]+$ ]]; then
+                    # Assume second arg is chunk size if it's a number
                     chunk_size="$1"
                 fi
                 shift
@@ -567,6 +567,12 @@ EOF
     # Security: reject shell metacharacters in output pattern
     if [[ -n "$output_pattern" && "$output_pattern" =~ [\|\&\$\`\'\;\<\>] ]]; then
         echo "Error: Invalid characters in output pattern" >&2
+        return 2
+    fi
+
+    # Security: reject shell metacharacters in output directory
+    if [[ -n "$output_dir" && "$output_dir" =~ [\|\&\$\`\'\;\<\>] ]]; then
+        echo "Error: Invalid characters in output directory" >&2
         return 2
     fi
 
