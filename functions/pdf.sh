@@ -630,7 +630,8 @@ EOF
     if [[ "$force" != true ]]; then
         local page_count
         # Run qpdf without suppressing stderr to see potential errors (password, corruption, etc.)
-        if ! page_count=$(qpdf --show-npages "$input"); then
+        # Use --warning-exit-0 to allow success even with warnings (exit code 3 -> 0)
+        if ! page_count=$(qpdf --warning-exit-0 --show-npages "$input"); then
             echo "Error: Failed to determine page count. qpdf output above." >&2
             return 1
         fi
@@ -649,7 +650,8 @@ EOF
     fi
 
     # Execute qpdf
-    if ! qpdf "$input" --split-pages="$chunk_size" "$full_path"; then
+    # Use --warning-exit-0 to allow success even with warnings
+    if ! qpdf --warning-exit-0 "$input" --split-pages="$chunk_size" "$full_path"; then
         echo "Error: Failed to burst PDF" >&2
         return 1
     fi
