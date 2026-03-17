@@ -267,10 +267,7 @@ EOF
         return 1
     fi
 
-    if ! command -v ffmpeg &> /dev/null; then
-        echo "Error: ffmpeg not installed. Install with: brew install ffmpeg" >&2
-        return 1
-    fi
+    _kit_require ffmpeg || return 1
 
     if [[ -z "$output" ]]; then
         output="${input%.*}_compressed.mp4"
