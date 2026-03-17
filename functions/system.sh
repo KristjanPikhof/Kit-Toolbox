@@ -346,11 +346,7 @@ EOF
     fi
 
     # Check if git is available
-    if ! command -v git &> /dev/null; then
-        echo "Error: git is not installed." >&2
-        echo "Please install git to use the update command." >&2
-        return 1
-    fi
+    _kit_require git || return 1
 
     # Read current version
     local current_version="unknown"
