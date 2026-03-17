@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.7.1
+# Kit's Toolkit v2.8.0
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -176,7 +176,6 @@ Cross-platform dependency management:
 
 ### 🧭 Navigation Shortcuts
 Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
-- **ccflare** — Toggle CCFlare proxy on/off (configurable via `ccflare.conf`)
 
 **Auto-generated navigation shortcuts** (configured in `shortcuts.conf`):
 ```bash
@@ -873,6 +872,7 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.8.0** — Removed unusable `ccflare` command
 **v2.7.1** — Version-aware ImageMagick dependency checks
 **v2.7.0** — PDF bursting and enhanced splitting
 **v2.6.0** — PDF processing functions
@@ -882,6 +882,9 @@ Use freely. Modify as needed.
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.8.0** (2026-03-17)
+  - 🗑️ Removed the unusable `ccflare` command and its config template
+  - 🧪 Removed obsolete `ccflare` tests
 - **v2.7.1** (2026-03-17)
   - 🔍 Centralized ImageMagick dependency validation in `deps.sh`
   - 🖼️ `deps-check` now distinguishes unsupported ImageMagick installs from missing dependencies
