@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.8.0
+# Kit's Toolkit v2.8.1
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -872,6 +872,7 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.8.1** — Installer now uses shared dependency checks
 **v2.8.0** — Removed unusable `ccflare` command
 **v2.7.1** — Version-aware ImageMagick dependency checks
 **v2.7.0** — PDF bursting and enhanced splitting
@@ -882,6 +883,9 @@ Use freely. Modify as needed.
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.8.1** (2026-03-17)
+  - 🔧 `install.sh` now uses the shared dependency catalog and version-aware ImageMagick checks from `deps.sh`
+  - 🧭 Added explicit invalid-usage handling to `goto` without changing its no-arg help behavior
 - **v2.8.0** (2026-03-17)
   - 🗑️ Removed the unusable `ccflare` command and its config template
   - 🧪 Removed obsolete `ccflare` tests
