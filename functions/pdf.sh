@@ -4,19 +4,8 @@
 # Dependencies: qpdf
 # Functions: pdf-split, pdf-merge, pdf-compress, pdf-rotate, pdf-burst
 
-# Helper function to check qpdf and show install instructions
-_kit_check_qpdf() {
-    if ! command -v qpdf &> /dev/null; then
-        echo "Error: qpdf not installed." >&2
-        local install_cmd
-        install_cmd=$(_kit_get_package_install_cmd "qpdf")
-        if [[ "$install_cmd" != Error:* ]]; then
-            echo "Install with: $install_cmd" >&2
-        fi
-        return 1
-    fi
-    return 0
-}
+# Alias for backward compatibility — delegates to the unified helper in deps.sh
+_kit_check_qpdf() { _kit_require qpdf; }
 
 pdf-split() {
     local force=false

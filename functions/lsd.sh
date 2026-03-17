@@ -4,13 +4,8 @@
 # Dependencies: lsd (brew install lsd)
 # Functions: list-files, list-all, list-reverse, list-all-reverse, list-tree
 
-# Check if lsd is installed
-_check_lsd() {
-    if ! command -v lsd &> /dev/null; then
-        echo "Error: lsd not installed. Install with: brew install lsd" >&2
-        return 1
-    fi
-}
+# Alias for backward compatibility — delegates to the unified helper in deps.sh
+_check_lsd() { _kit_require lsd; }
 
 # List files in long format sorted by modification time
 list-files() {

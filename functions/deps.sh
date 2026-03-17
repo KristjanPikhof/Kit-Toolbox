@@ -144,6 +144,29 @@ _kit_check_dependency() {
     eval "$check_cmd" &> /dev/null
 }
 
+# Require a tool to be installed, or print cross-platform install instructions and return 1
+# Usage: _kit_require <command> [package_name]
+#   command      - The command to check (e.g., ffmpeg, qpdf, lsd)
+#   package_name - Optional package name if different from command (e.g., "imagemagick" for "magick")
+_kit_require() {
+    local cmd="$1"
+    local pkg="${2:-$1}"
+
+    if command -v "$cmd" &> /dev/null; then
+        return 0
+    fi
+
+    echo "Error: $cmd not installed." >&2
+    local install_cmd
+    install_cmd=$(_kit_get_package_install_cmd "$(_kit_get_package_name "$pkg")")
+    if [[ "$install_cmd" != Error:* ]]; then
+        echo "Install with: $install_cmd" >&2
+    else
+        echo "$install_cmd" >&2
+    fi
+    return 1
+}
+
 # Check all dependencies and show status
 deps-check() {
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
