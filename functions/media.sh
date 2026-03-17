@@ -165,10 +165,7 @@ EOF
     fi
 
     # Dependency check
-    if ! command -v ffmpeg &> /dev/null; then
-        echo "Error: ffmpeg not installed. Install with: brew install ffmpeg" >&2
-        return 1
-    fi
+    _kit_require ffmpeg || return 1
 
     local filename="${input%.*}"
     local output="${filename}.mp3"
