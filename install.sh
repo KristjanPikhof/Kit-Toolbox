@@ -101,15 +101,14 @@ EOF
 
 print_success "Added Kit configuration to .zshrc"
 
-# Check for optional dependencies
+# Check toolkit dependencies
 echo ""
-print_info "Checking optional dependencies..."
+print_info "Checking toolkit dependencies..."
 
-# Source shared package manager detection functions from deps.sh
+# Source shared dependency helpers from deps.sh
 if [[ -f "$KIT_DIR/functions/deps.sh" ]]; then
     source "$KIT_DIR/functions/deps.sh"
 
-    # Create wrapper functions to use the internal functions from deps.sh
     detect_package_manager() {
         _kit_detect_package_manager
     }
@@ -117,6 +116,21 @@ if [[ -f "$KIT_DIR/functions/deps.sh" ]]; then
     get_install_cmd() {
         local pkg="$1"
         _kit_get_package_install_cmd "$pkg"
+    }
+
+    get_package_name() {
+        local category="$1"
+        _kit_get_package_name "$category"
+    }
+
+    get_dependency_status() {
+        local category="$1"
+        local check_cmd="$2"
+        _kit_get_dependency_status "$category" "$check_cmd"
+    }
+
+    list_dependencies() {
+        _kit_get_dependencies
     }
 else
     # Fallback functions if deps.sh is not available
@@ -189,55 +203,132 @@ else
                 ;;
         esac
     }
+
+    get_package_name() {
+        local category="$1"
+        echo "$category"
+    }
+
+    get_dependency_status() {
+        local category="$1"
+        local check_cmd="$2"
+
+        if eval "$check_cmd" &> /dev/null; then
+            echo "installed"
+        else
+            echo "missing"
+        fi
+    }
+
+    list_dependencies() {
+        cat << 'EOF'
+imagemagick|command -v magick|imagemagick|ImageMagick v7+ for image processing
+yt-dlp|command -v yt-dlp|yt-dlp|YouTube/media downloader
+ffmpeg|command -v ffmpeg|ffmpeg|Video/audio processing
+qpdf|command -v qpdf|qpdf|PDF transformation and optimization toolkit
+lsd|command -v lsd|lsd|Enhanced file listing
+lsof|command -v lsof|lsof|List open files (for killports)
+EOF
+    }
 fi
 
-check_dependency() {
-    local cmd="$1"
-    local pkg="$2"
-    local category="$3"
+print_dependency_status() {
+    local category="$1"
+    local package_name="$2"
+    local description="$3"
+    local dep_state="$4"
 
-    if command -v "$cmd" &> /dev/null; then
-        print_success "$cmd installed (for $category)"
-        return 0
-    else
-        print_warning "$cmd not found (needed for $category)"
-        local install_cmd
-        install_cmd=$(get_install_cmd "$pkg")
-        # Check if output doesn't start with "Error"
-        if [[ "$install_cmd" != Error:* ]]; then
-            echo "   Install with: $install_cmd"
-        else
-            echo "   $install_cmd"
-        fi
-        return 1
-    fi
+    case "$dep_state" in
+        installed)
+            print_success "$package_name installed ($description)"
+            return 0
+            ;;
+        legacy_v6)
+            print_warning "ImageMagick v6 detected ($description)"
+            echo "   Upgrade to v7+ with the 'magick' command."
+            if declare -f _kit_imagemagick_install_help > /dev/null 2>&1; then
+                _kit_imagemagick_install_help "upgrade"
+            fi
+            return 1
+            ;;
+        missing_magick)
+            print_warning "ImageMagick detected, but 'magick' is missing ($description)"
+            echo "   Reinstall or fix PATH so the v7 CLI is available."
+            if declare -f _kit_imagemagick_install_help > /dev/null 2>&1; then
+                _kit_imagemagick_install_help "upgrade"
+            fi
+            return 1
+            ;;
+        *)
+            print_warning "$package_name not found ($description)"
+            local install_cmd
+            install_cmd=$(get_install_cmd "$package_name")
+            if [[ "$install_cmd" != Error:* ]]; then
+                echo "   Install with: $install_cmd"
+            else
+                echo "   $install_cmd"
+            fi
+            return 1
+            ;;
+    esac
 }
 
-MISSING_DEPS=()
+ACTION_DEPS=()
 
-check_dependency "magick" "imagemagick" "Image Processing" || MISSING_DEPS+=("imagemagick")
-check_dependency "yt-dlp" "yt-dlp" "Media Processing" || MISSING_DEPS+=("yt-dlp")
-check_dependency "ffmpeg" "ffmpeg" "Media Processing" || MISSING_DEPS+=("ffmpeg")
-check_dependency "lsd" "lsd" "Enhanced File Listing" || MISSING_DEPS+=("lsd")
+while IFS='|' read -r category check_cmd package_name description; do
+    [[ -z "$category" ]] && continue
 
-# Offer to install missing dependencies
-if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
+    dep_state=$(get_dependency_status "$category" "$check_cmd")
+    actual_pkg_name=$(get_package_name "$category")
+
+    if ! print_dependency_status "$category" "$actual_pkg_name" "$description" "$dep_state"; then
+        ACTION_DEPS+=("$category|$actual_pkg_name|$dep_state")
+    fi
+done < <(list_dependencies)
+
+# Offer to install missing or unsupported dependencies
+if [[ ${#ACTION_DEPS[@]} -gt 0 ]]; then
     echo ""
-    print_info "Missing optional dependencies: ${MISSING_DEPS[*]}"
+    print_info "Dependencies needing action:"
+    for dep in "${ACTION_DEPS[@]}"; do
+        pkg_name="${dep#*|}"
+        pkg_name="${pkg_name%%|*}"
+        echo "  - $pkg_name"
+    done
 
-    local pm="$(detect_package_manager)"
+    pm="$(detect_package_manager)"
+    needs_imagemagick_ppa=false
+    if [[ "$pm" == "apt" ]]; then
+        for dep in "${ACTION_DEPS[@]}"; do
+            dep_category="${dep%%|*}"
+            if [[ "$dep_category" == "imagemagick" ]]; then
+                needs_imagemagick_ppa=true
+                break
+            fi
+        done
+    fi
+
+    if [[ "$needs_imagemagick_ppa" == "true" ]]; then
+        echo ""
+        print_warning "ImageMagick v7 is required for image functions."
+        echo "   On Ubuntu/Debian, you may need to add the official PPA first:"
+        echo "   sudo add-apt-repository ppa:imagemagick/ppa"
+        echo "   sudo apt update"
+    fi
+
     if [[ "$pm" != "none" ]]; then
         echo ""
-        read "response?Install missing dependencies? (y/N): "
+        read "response?Install or upgrade these dependencies? (y/N): "
         if [[ "$response" =~ ^[Yy]$ ]]; then
             print_info "Installing dependencies..."
-            for dep in "${MISSING_DEPS[@]}"; do
-                local install_cmd
-                install_cmd=$(get_install_cmd "$dep")
+            for dep in "${ACTION_DEPS[@]}"; do
+                dep_rest="${dep#*|}"
+                pkg_name="${dep_rest%%|*}"
+                install_cmd=$(get_install_cmd "$pkg_name")
                 if eval "$install_cmd"; then
-                    print_success "$dep installed"
+                    print_success "$pkg_name installed"
                 else
-                    print_error "Failed to install $dep"
+                    print_error "Failed to install $pkg_name"
                 fi
             done
             print_success "Dependency installation complete"
