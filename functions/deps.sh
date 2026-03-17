@@ -244,10 +244,10 @@ _kit_get_dependency_status() {
 # Require ImageMagick v7+ via the `magick` command. Older v6 installs still ship
 # `convert`, but Kit uses `magick` everywhere, so v6 must be treated as unsupported.
 _kit_require_imagemagick() {
-    local dep_status
-    dep_status=$(_kit_get_imagemagick_status)
+    local im_status
+    im_status=$(_kit_get_imagemagick_status)
 
-    case "$dep_status" in
+    case "$im_status" in
         installed)
             return 0
             ;;
@@ -347,10 +347,7 @@ EOF
         # Skip empty lines
         [[ -z "$category" ]] && continue
 
-        local dep_status
-        dep_status=$(_kit_get_dependency_status "$category" "$check_cmd")
-
-        case "$dep_status" in
+        case "$(_kit_get_dependency_status "$category" "$check_cmd")" in
             installed)
                 echo "✓ $package_name - $description"
                 ((installed_count++))
@@ -464,13 +461,13 @@ EOF
         # Skip empty lines
         [[ -z "$category" ]] && continue
 
-        local dep_status
-        dep_status=$(_kit_get_dependency_status "$category" "$check_cmd")
+        local dep_state
+        dep_state=$(_kit_get_dependency_status "$category" "$check_cmd")
 
-        if [[ "$dep_status" != "installed" ]]; then
+        if [[ "$dep_state" != "installed" ]]; then
             local actual_pkg_name
             actual_pkg_name=$(_kit_get_package_name "$category")
-            action_required_deps+=("$actual_pkg_name|$description|$dep_status")
+            action_required_deps+=("$actual_pkg_name|$description|$dep_state")
             ((action_required_count++))
         fi
     done < <(_kit_get_dependencies)
@@ -487,9 +484,9 @@ EOF
         local pkg_name="${dep%%|*}"
         local rest="${dep#*|}"
         local desc="${rest%%|*}"
-        local dep_status="${dep##*|}"
+        local dep_state="${dep##*|}"
 
-        case "$dep_status" in
+        case "$dep_state" in
             legacy_v6)
                 echo "  • $pkg_name - $desc (legacy v6 detected; upgrade required)"
                 ;;
