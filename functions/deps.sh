@@ -144,6 +144,151 @@ _kit_check_dependency() {
     eval "$check_cmd" &> /dev/null
 }
 
+# Helper function to print ImageMagick installation instructions
+# Usage: _kit_imagemagick_install_help <mode>
+#   mode: "install" or "upgrade"
+_kit_imagemagick_install_help() {
+    local mode="$1"
+    local action="install"
+
+    if [[ "$mode" == "upgrade" ]]; then
+        action="upgrade"
+    fi
+
+    case "$(uname -s)" in
+        Darwin)
+            if [[ "$mode" == "upgrade" ]]; then
+                echo "  brew $action imagemagick" >&2
+                echo "  # If that doesn't work, try:" >&2
+                echo "  brew reinstall imagemagick" >&2
+            else
+                echo "  brew $action imagemagick" >&2
+            fi
+            ;;
+        Linux)
+            echo "  # Ubuntu/Debian - add official PPA for v7:" >&2
+            echo "  sudo add-apt-repository ppa:imagemagick/ppa" >&2
+            if [[ "$mode" == "upgrade" ]]; then
+                echo "  sudo apt update" >&2
+                echo "  sudo apt $action imagemagick" >&2
+            else
+                echo "  sudo apt update && sudo apt $action imagemagick" >&2
+            fi
+            echo "" >&2
+            echo "  # Fedora:" >&2
+            echo "  sudo dnf $action ImageMagick" >&2
+            echo "" >&2
+            echo "  # Arch:" >&2
+            echo "  sudo pacman -S imagemagick" >&2
+            ;;
+        *)
+            echo "  See: https://imagemagick.org/script/download.php" >&2
+            ;;
+    esac
+}
+
+_kit_get_imagemagick_version_line() {
+    if command -v magick &> /dev/null; then
+        magick --version 2>/dev/null | head -1
+        return 0
+    fi
+
+    if command -v convert &> /dev/null; then
+        convert --version 2>/dev/null | head -1
+        return 0
+    fi
+
+    return 1
+}
+
+# Prefer the modern `magick` CLI. If only `convert` exists, inspect its version
+# so we can distinguish legacy ImageMagick 6 from a broken ImageMagick 7 install.
+_kit_get_imagemagick_status() {
+    if command -v magick &> /dev/null; then
+        echo "installed"
+        return 0
+    fi
+
+    if command -v convert &> /dev/null; then
+        local version_line
+        version_line=$(convert --version 2>/dev/null | head -1)
+        if [[ "$version_line" == *"ImageMagick 7."* ]]; then
+            echo "missing_magick"
+        else
+            echo "legacy_v6"
+        fi
+        return 0
+    fi
+
+    echo "missing"
+}
+
+_kit_get_dependency_status() {
+    local category="$1"
+    local check_cmd="$2"
+
+    case "$category" in
+        imagemagick)
+            _kit_get_imagemagick_status
+            ;;
+        *)
+            if _kit_check_dependency "$check_cmd"; then
+                echo "installed"
+            else
+                echo "missing"
+            fi
+            ;;
+    esac
+}
+
+# Require ImageMagick v7+ via the `magick` command. Older v6 installs still ship
+# `convert`, but Kit uses `magick` everywhere, so v6 must be treated as unsupported.
+_kit_require_imagemagick() {
+    local dep_status
+    dep_status=$(_kit_get_imagemagick_status)
+
+    case "$dep_status" in
+        installed)
+            return 0
+            ;;
+        legacy_v6)
+            local version_line
+            version_line=$(_kit_get_imagemagick_version_line)
+            echo "Error: ImageMagick v6 detected. Kit requires ImageMagick v7+." >&2
+            echo "" >&2
+            if [[ -n "$version_line" ]]; then
+                echo "Detected: $version_line" >&2
+            fi
+            echo "Kit's image functions require the 'magick' command from v7+." >&2
+            echo "" >&2
+            echo "Upgrade instructions:" >&2
+            _kit_imagemagick_install_help "upgrade"
+            return 1
+            ;;
+        missing_magick)
+            local version_line
+            version_line=$(_kit_get_imagemagick_version_line)
+            echo "Error: ImageMagick detected, but the 'magick' command is not available." >&2
+            echo "" >&2
+            if [[ -n "$version_line" ]]; then
+                echo "Detected: $version_line" >&2
+            fi
+            echo "Kit prioritizes the modern ImageMagick CLI and requires 'magick' on PATH." >&2
+            echo "" >&2
+            echo "Reinstall or fix PATH so 'magick' is available:" >&2
+            _kit_imagemagick_install_help "upgrade"
+            return 1
+            ;;
+        *)
+            echo "Error: ImageMagick not found. Install v7+ for image functions." >&2
+            echo "" >&2
+            echo "Install with:" >&2
+            _kit_imagemagick_install_help "install"
+            return 1
+            ;;
+    esac
+}
+
 # Require a tool to be installed, or print cross-platform install instructions and return 1
 # Usage: _kit_require <command> [package_name]
 #   command      - The command to check (e.g., ffmpeg, qpdf, lsd)
@@ -151,6 +296,11 @@ _kit_check_dependency() {
 _kit_require() {
     local cmd="$1"
     local pkg="${2:-$1}"
+
+    if [[ "$cmd" == "magick" || "$pkg" == "imagemagick" ]]; then
+        _kit_require_imagemagick
+        return $?
+    fi
 
     if command -v "$cmd" &> /dev/null; then
         return 0
@@ -190,29 +340,45 @@ EOF
     echo ""
 
     local installed_count=0
+    local unsupported_count=0
     local missing_count=0
 
     while IFS='|' read -r category check_cmd package_name description; do
         # Skip empty lines
         [[ -z "$category" ]] && continue
 
-        if _kit_check_dependency "$check_cmd"; then
-            echo "✓ $package_name - $description"
-            ((installed_count++))
-        else
-            echo "✗ $package_name - $description"
-            ((missing_count++))
-        fi
+        local dep_status
+        dep_status=$(_kit_get_dependency_status "$category" "$check_cmd")
+
+        case "$dep_status" in
+            installed)
+                echo "✓ $package_name - $description"
+                ((installed_count++))
+                ;;
+            legacy_v6)
+                echo "⚠️  $package_name - ImageMagick v6 detected; upgrade to v7+ with 'magick'"
+                ((unsupported_count++))
+                ;;
+            missing_magick)
+                echo "⚠️  $package_name - ImageMagick detected, but 'magick' is missing from PATH"
+                ((unsupported_count++))
+                ;;
+            *)
+                echo "✗ $package_name - $description"
+                ((missing_count++))
+                ;;
+        esac
     done < <(_kit_get_dependencies)
 
     echo ""
-    echo "Summary: $installed_count installed, $missing_count missing"
+    echo "Summary: $installed_count installed, $unsupported_count unsupported, $missing_count missing"
     echo ""
 
-    if [[ $missing_count -gt 0 ]]; then
-        echo "Install missing dependencies with:"
+    if [[ $unsupported_count -gt 0 || $missing_count -gt 0 ]]; then
+        echo "Install or upgrade dependencies with:"
         echo "  kit deps-install"
         echo ""
+        return 1
     fi
 
     return 0
@@ -291,40 +457,56 @@ EOF
     echo ""
 
     # Build list of missing dependencies
-    local missing_deps=()
-    local missing_count=0
+    local action_required_deps=()
+    local action_required_count=0
 
     while IFS='|' read -r category check_cmd package_name description; do
         # Skip empty lines
         [[ -z "$category" ]] && continue
 
-        if ! _kit_check_dependency "$check_cmd"; then
+        local dep_status
+        dep_status=$(_kit_get_dependency_status "$category" "$check_cmd")
+
+        if [[ "$dep_status" != "installed" ]]; then
             local actual_pkg_name
             actual_pkg_name=$(_kit_get_package_name "$category")
-            missing_deps+=("$actual_pkg_name|$description")
-            ((missing_count++))
+            action_required_deps+=("$actual_pkg_name|$description|$dep_status")
+            ((action_required_count++))
         fi
     done < <(_kit_get_dependencies)
 
-    if [[ $missing_count -eq 0 ]]; then
+    if [[ $action_required_count -eq 0 ]]; then
         echo "✓ All dependencies are already installed!"
         echo ""
         return 0
     fi
 
-    echo "Found $missing_count missing dependencies:"
+    echo "Found $action_required_count dependencies needing action:"
     echo ""
-    for dep in "${missing_deps[@]}"; do
+    for dep in "${action_required_deps[@]}"; do
         local pkg_name="${dep%%|*}"
-        local desc="${dep##*|}"
-        echo "  • $pkg_name - $desc"
+        local rest="${dep#*|}"
+        local desc="${rest%%|*}"
+        local dep_status="${dep##*|}"
+
+        case "$dep_status" in
+            legacy_v6)
+                echo "  • $pkg_name - $desc (legacy v6 detected; upgrade required)"
+                ;;
+            missing_magick)
+                echo "  • $pkg_name - $desc ('magick' command missing; reinstall/fix PATH)"
+                ;;
+            *)
+                echo "  • $pkg_name - $desc"
+                ;;
+        esac
     done
     echo ""
 
     # Special handling for ImageMagick on Ubuntu/Debian
     local pm_needs_imagemagick_ppa=false
     if [[ "$pm" == "apt" ]]; then
-        for dep in "${missing_deps[@]}"; do
+        for dep in "${action_required_deps[@]}"; do
             local pkg_name="${dep%%|*}"
             if [[ "$pkg_name" == "imagemagick" ]]; then
                 pm_needs_imagemagick_ppa=true
@@ -345,7 +527,7 @@ EOF
     if [[ "$dry_run" == "true" ]]; then
         echo "Commands that would be run:"
         echo ""
-        for dep in "${missing_deps[@]}"; do
+        for dep in "${action_required_deps[@]}"; do
             local pkg_name="${dep%%|*}"
             local install_cmd
             install_cmd=$(_kit_get_package_install_cmd "$pkg_name")
@@ -362,7 +544,7 @@ EOF
 
     # Confirm installation
     if [[ "$auto_confirm" != "true" ]]; then
-        echo "Install missing dependencies? (y/N):"
+        echo "Install or upgrade these dependencies? (y/N):"
         read -r response
         if [[ ! "$response" =~ ^[Yy]$ ]]; then
             echo "Installation cancelled."
@@ -378,9 +560,10 @@ EOF
     local success_count=0
     local fail_count=0
 
-    for dep in "${missing_deps[@]}"; do
+    for dep in "${action_required_deps[@]}"; do
         local pkg_name="${dep%%|*}"
-        local desc="${dep##*|}"
+        local rest="${dep#*|}"
+        local desc="${rest%%|*}"
 
         echo "→ Installing $pkg_name..."
 
@@ -411,18 +594,29 @@ EOF
     echo ""
 
     # Verify ImageMagick v7 specifically
-    if command -v magick &> /dev/null; then
-        local magick_version
-        magick_version=$(magick --version 2>/dev/null | head -1)
-        echo "✓ ImageMagick: $magick_version"
-    elif command -v convert &> /dev/null; then
-        echo "⚠️  Warning: ImageMagick v6 detected (convert command found)." >&2
-        echo "   Image functions require v7+ with 'magick' command." >&2
-        echo "   On Ubuntu/Debian:" >&2
-        echo "     sudo add-apt-repository ppa:imagemagick/ppa" >&2
-        echo "     sudo apt update && sudo apt install imagemagick" >&2
-        echo ""
-    fi
+    local imagemagick_status
+    imagemagick_status=$(_kit_get_imagemagick_status)
+    case "$imagemagick_status" in
+        installed)
+            local magick_version
+            magick_version=$(_kit_get_imagemagick_version_line)
+            echo "✓ ImageMagick: $magick_version"
+            ;;
+        legacy_v6)
+            echo "⚠️  Warning: ImageMagick v6 detected after install." >&2
+            echo "   Image functions require v7+ with 'magick' command." >&2
+            echo "   Upgrade with:" >&2
+            _kit_imagemagick_install_help "upgrade"
+            echo ""
+            ;;
+        missing_magick)
+            echo "⚠️  Warning: ImageMagick detected, but 'magick' is still missing from PATH." >&2
+            echo "   Reinstall or fix PATH so Kit can use the modern CLI." >&2
+            echo "   Suggested fix:" >&2
+            _kit_imagemagick_install_help "upgrade"
+            echo ""
+            ;;
+    esac
 
     return 0
 }
