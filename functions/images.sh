@@ -397,78 +397,6 @@ EOF
     return 1
 }
 
-# Helper function to print ImageMagick installation instructions
-# Usage: _kit_imagemagick_install_help <mode>
-#   mode: "install" or "upgrade"
-_kit_imagemagick_install_help() {
-    local mode="$1"
-    local action="install"
-    local preface="Install with:"
-
-    if [[ "$mode" == "upgrade" ]]; then
-        action="upgrade"
-        preface="Upgrade instructions:"
-    fi
-
-    case "$(uname -s)" in
-        Darwin)
-            if [[ "$mode" == "upgrade" ]]; then
-                echo "  brew $action imagemagick" >&2
-                echo "  # If that doesn't work, try:" >&2
-                echo "  brew reinstall imagemagick" >&2
-            else
-                echo "  brew $action imagemagick" >&2
-            fi
-            ;;
-        Linux)
-            echo "  # Ubuntu/Debian - add official PPA for v7:" >&2
-            echo "  sudo add-apt-repository ppa:imagemagick/ppa" >&2
-            if [[ "$mode" == "upgrade" ]]; then
-                echo "  sudo apt update" >&2
-                echo "  sudo apt $action imagemagick" >&2
-            else
-                echo "  sudo apt update && sudo apt $action imagemagick" >&2
-            fi
-            echo "" >&2
-            echo "  # Fedora:" >&2
-            echo "  sudo dnf $action ImageMagick" >&2
-            echo "" >&2
-            echo "  # Arch:" >&2
-            echo "  sudo pacman -S imagemagick" >&2
-            ;;
-        *)
-            echo "  See: https://imagemagick.org/script/download.php" >&2
-            ;;
-    esac
-}
-
-# Helper function to check ImageMagick v7 availability
-_kit_require_imagemagick() {
-    # Check for v7 (magick command)
-    if command -v magick > /dev/null 2>&1; then
-        return 0
-    fi
-
-    # Check for v6 (convert command) and provide migration help
-    if command -v convert > /dev/null 2>&1; then
-        echo "Error: ImageMagick v6 detected. Kit requires ImageMagick v7+." >&2
-        echo "" >&2
-        echo "You have ImageMagick v6 (uses 'convert' command)." >&2
-        echo "Kit's image functions require v7+ (uses 'magick' command)." >&2
-        echo "" >&2
-        echo "Upgrade instructions:" >&2
-        _kit_imagemagick_install_help "upgrade"
-        return 1
-    fi
-
-    # No ImageMagick found at all
-    echo "Error: ImageMagick not found. Install v7+ for image functions." >&2
-    echo "" >&2
-    echo "Install with:" >&2
-    _kit_imagemagick_install_help "install"
-    return 1
-}
-
 # Image Resize by Width (height auto-calculated to preserve aspect ratio)
 img-resize-width() {
     local force=false
@@ -543,7 +471,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -710,7 +638,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -881,7 +809,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1013,7 +941,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1085,7 +1013,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1201,7 +1129,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1315,7 +1243,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1360,7 +1288,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1405,7 +1333,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1450,7 +1378,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1490,7 +1418,7 @@ EOF
     local success_count=0
     local fail_count=0
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1559,7 +1487,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 
@@ -1621,7 +1549,7 @@ EOF
         return 1
     fi
 
-    if ! _kit_require_imagemagick; then
+    if ! _kit_require magick imagemagick; then
         return 1
     fi
 

@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.7.0
+# Kit's Toolkit v2.8.1
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -176,7 +176,6 @@ Cross-platform dependency management:
 
 ### 🧭 Navigation Shortcuts
 Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
-- **ccflare** — Toggle CCFlare proxy on/off (configurable via `ccflare.conf`)
 
 **Auto-generated navigation shortcuts** (configured in `shortcuts.conf`):
 ```bash
@@ -729,6 +728,10 @@ kit deps-install --dry-run
 kit deps-install --yes
 ```
 
+`kit deps-check` distinguishes missing dependencies from unsupported installs.
+For ImageMagick, Kit prefers v7+ with the `magick` command and will flag legacy
+or misconfigured installs separately so upgrade steps are clearer.
+
 ### Supported Platforms
 
 The toolkit supports **macOS** and **Linux** with the following package managers:
@@ -869,6 +872,9 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.8.1** — Installer now uses shared dependency checks
+**v2.8.0** — Removed unusable `ccflare` command
+**v2.7.1** — Version-aware ImageMagick dependency checks
 **v2.7.0** — PDF bursting and enhanced splitting
 **v2.6.0** — PDF processing functions
 **v2.4.4** — Comprehensive test suite
@@ -877,6 +883,17 @@ Use freely. Modify as needed.
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.8.1** (2026-03-17)
+  - 🔧 `install.sh` now uses the shared dependency catalog and version-aware ImageMagick checks from `deps.sh`
+  - 🧭 Added explicit invalid-usage handling to `goto` without changing its no-arg help behavior
+- **v2.8.0** (2026-03-17)
+  - 🗑️ Removed the unusable `ccflare` command and its config template
+  - 🧪 Removed obsolete `ccflare` tests
+- **v2.7.1** (2026-03-17)
+  - 🔍 Centralized ImageMagick dependency validation in `deps.sh`
+  - 🖼️ `deps-check` now distinguishes unsupported ImageMagick installs from missing dependencies
+  - 🔧 Image functions use the shared dependency path for ImageMagick checks
+  - 📝 Updated dependency documentation for version-aware ImageMagick handling
 - **v2.7.0** (2026-02-09)
   - 📄 Added `pdf-burst` — Split PDF into multiple files of fixed page count
   - 📂 Default behavior creates dedicated subdirectory for burst files

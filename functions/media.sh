@@ -31,10 +31,7 @@ EOF
     local opts=(--no-playlist --embed-metadata --embed-thumbnail)
 
     # Dependency check
-    if ! command -v yt-dlp &> /dev/null; then
-        echo "Error: yt-dlp not installed. Install with: brew install yt-dlp" >&2
-        return 1
-    fi
+    _kit_require yt-dlp || return 1
 
     # Mode validation
     case "$mode" in
@@ -102,10 +99,7 @@ EOF
     fi
 
     # Dependency check
-    if ! command -v ffmpeg &> /dev/null; then
-        echo "Error: ffmpeg not installed. Install with: brew install ffmpeg" >&2
-        return 1
-    fi
+    _kit_require ffmpeg || return 1
 
     local output="${input%.*}_noaudio.mp4"
 
@@ -171,10 +165,7 @@ EOF
     fi
 
     # Dependency check
-    if ! command -v ffmpeg &> /dev/null; then
-        echo "Error: ffmpeg not installed. Install with: brew install ffmpeg" >&2
-        return 1
-    fi
+    _kit_require ffmpeg || return 1
 
     local filename="${input%.*}"
     local output="${filename}.mp3"
@@ -276,10 +267,7 @@ EOF
         return 1
     fi
 
-    if ! command -v ffmpeg &> /dev/null; then
-        echo "Error: ffmpeg not installed. Install with: brew install ffmpeg" >&2
-        return 1
-    fi
+    _kit_require ffmpeg || return 1
 
     if [[ -z "$output" ]]; then
         output="${input%.*}_compressed.mp4"
