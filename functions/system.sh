@@ -81,23 +81,7 @@ EOF
     local failed_count=0
 
     # Check if lsof is available
-    if ! command -v lsof &> /dev/null; then
-        echo "Error: 'lsof' command not found" >&2
-        local os="$(_kit_detect_os)"
-        case "$os" in
-            macos)
-                echo "This command is available by default on macOS" >&2
-                ;;
-            linux)
-                echo "Install with: sudo apt install lsof (Debian/Ubuntu)" >&2
-                echo "              sudo yum install lsof (RHEL/CentOS)" >&2
-                ;;
-            *)
-                echo "Please install lsof for your system" >&2
-                ;;
-        esac
-        return 1
-    fi
+    _kit_require lsof || return 1
 
     for port in "${ports[@]}"; do
         # Validate port is numeric
