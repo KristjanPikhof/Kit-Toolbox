@@ -52,6 +52,12 @@ EOF
         return 0
     fi
 
+    if [[ $# -gt 1 ]]; then
+        echo "Error: Too many arguments. Expected exactly one shortcut name." >&2
+        echo "Usage: kit goto <shortcut_name>" >&2
+        return 2
+    fi
+
     local shortcut_name="$1"
     local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
 
