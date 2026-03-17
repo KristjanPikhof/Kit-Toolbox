@@ -31,10 +31,7 @@ EOF
     local opts=(--no-playlist --embed-metadata --embed-thumbnail)
 
     # Dependency check
-    if ! command -v yt-dlp &> /dev/null; then
-        echo "Error: yt-dlp not installed. Install with: brew install yt-dlp" >&2
-        return 1
-    fi
+    _kit_require yt-dlp || return 1
 
     # Mode validation
     case "$mode" in
