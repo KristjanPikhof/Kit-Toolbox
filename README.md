@@ -136,9 +136,9 @@ Process images using ImageMagick:
 - **img-resize** — Resize image preserving aspect ratio
 - **img-resize-width** — Resize image to specific width (auto height)
 - **img-resize-percentage** — Resize image by percentage (for upscaling/downscaling)
-- **img-optimize** — Strip metadata and compress
+- **img-optimize** — Strip metadata and recompress without changing format
 - **img-convert** — Batch convert image formats
-- **img-optimize-to-webp** — Convert images to optimized WebP (supports directory target)
+- **img-optimize-to-webp** — Convert a single image or directory of images to optimized WebP
 - **img-thumbnail** — Fast thumbnail generation
 - **img-resize-exact** — Force exact dimensions (may distort)
 - **img-resize-fill** — Resize to fill area, crop excess
