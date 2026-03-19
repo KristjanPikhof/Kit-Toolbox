@@ -75,6 +75,7 @@ Tests all toolkit functions using the `kit <command>` format (same as users use)
 ```bash
 kit img-resize-width 400 test_input_800x600.jpg
 kit img-optimize test_input_1920x1080.jpg
+kit img-optimize-to-webp test_input_1920x1080.jpg
 kit img-thumbnail 150 test_input_small.jpg
 kit img-rename "test photo with spaces.jpg" --dry-run
 # ... and 13 more image tests
