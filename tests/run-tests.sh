@@ -317,6 +317,7 @@ run_test "img-resize-width: help works" "kit img-resize-width -h"
 run_test "img-resize-percentage: help works" "kit img-resize-percentage -h"
 run_test "img-optimize: help works" "kit img-optimize -h"
 run_test "img-convert: help works" "kit img-convert -h"
+run_test "img-optimize-to-webp: help works" "kit img-optimize-to-webp -h"
 run_test "img-thumbnail: help works" "kit img-thumbnail -h"
 run_test "img-resize: help works" "kit img-resize -h"
 run_test "img-resize-exact: help works" "kit img-resize-exact -h"
@@ -348,6 +349,16 @@ if has_test_file "$ASSETS_DIR/images/*.jpg"; then
         rm -f "test_input_1920x1080-optimized.jpg" 2>/dev/null
         run_test "img-optimize: functional test" \
             "kit img-optimize test_input_1920x1080.jpg && [[ -f 'test_input_1920x1080-optimized.jpg' ]]"
+        cd - >/dev/null
+    fi
+
+    # Test img-optimize-to-webp with a single file (creates output in optimized/)
+    if [[ -f "$ASSETS_DIR/images/test_input_1920x1080.jpg" ]]; then
+        cd "$ASSETS_DIR/images"
+        # Clean up any existing output
+        rm -f "optimized/test_input_1920x1080.webp" 2>/dev/null
+        run_test "img-optimize-to-webp: single file functional test" \
+            "kit img-optimize-to-webp test_input_1920x1080.jpg && [[ -f 'optimized/test_input_1920x1080.webp' ]]"
         cd - >/dev/null
     fi
 
