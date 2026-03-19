@@ -755,14 +755,16 @@ img-optimize() {
             -h|--help)
                 cat << EOF
 Usage: kit img-optimize <file|directory> [options]
-Description: Optimize image by stripping metadata and compressing
-Effect: Strips EXIF/metadata and sets quality to 85%
+Description: Optimize image size without changing its format
+Effect: Strips EXIF/metadata and recompresses the image at quality 85%
+Note: Keeps the original format (PNG stays PNG, JPG stays JPG)
 Options:
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be optimized without making changes
   -r, --recursive  Process directories recursively
 Examples:
   kit img-optimize photo.jpg
+  kit img-optimize logo.png          # Creates logo-optimized.png
   kit img-optimize . --recursive --dry-run
   kit img-optimize image.png --force
 Output: Creates photo-optimized.jpg
@@ -988,14 +990,15 @@ img-optimize-to-webp() {
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-optimize-to-webp [directory]
-Description: Convert all supported images (PNG, JPG, HEIC) to optimized WebP format
+Usage: kit img-optimize-to-webp [file|directory]
+Description: Convert a supported image or directory of images to optimized WebP format
 Features: Maximum quality (90), best compression (method=6, pass=10), sharp-yuv enabled
-Supported: PNG, JPG, JPEG, HEIC
+Supported input: PNG, JPG, JPEG, HEIC
 Example: 
-  kit img-optimize-to-webp        # Current directory
-  kit img-optimize-to-webp ./pics # Process ./pics
-Output: Creates <directory>/optimized/ directory with WebP files
+  kit img-optimize-to-webp photo.jpg   # Creates ./optimized/photo.webp
+  kit img-optimize-to-webp             # Current directory
+  kit img-optimize-to-webp ./pics      # Process ./pics
+Output: Creates <target>/optimized/ directory with WebP files
 EOF
                 return 0
                 ;;
@@ -1008,12 +1011,78 @@ EOF
         esac
     done
 
-    if [[ ! -d "$target" ]]; then
-        echo "Error: Directory '$target' does not exist" >&2
+    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
+       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
+       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
+        echo "Error: Target contains invalid characters" >&2
+        return 1
+    fi
+
+    if [[ ! -e "$target" ]]; then
+        echo "Error: Target '$target' does not exist" >&2
         return 1
     fi
 
     if ! _kit_require magick imagemagick; then
+        return 1
+    fi
+
+    _is_webp_source_file() {
+        local file="$1"
+        local extension="${file##*.}"
+        extension="${extension% }"
+        extension="${extension# }"
+
+        local -a extensions=(png jpg jpeg heic)
+        for ext in "${extensions[@]}"; do
+            if [[ "${extension:l}" == "${ext:l}" ]]; then
+                return 0
+            fi
+        done
+        return 1
+    }
+
+    _process_single_optimize_to_webp() {
+        local input="$1"
+
+        if ! _is_webp_source_file "$input"; then
+            echo "Error: Unsupported input file '$input' (supported: PNG, JPG, JPEG, HEIC)" >&2
+            return 1
+        fi
+
+        local parent_dir="${input%/*}"
+        local basename="${input##*/}"
+        local filename="${basename%.*}"
+        [[ "$parent_dir" == "$input" ]] && parent_dir="."
+
+        local out_dir="${parent_dir}/optimized"
+        local output="${out_dir}/${filename}.webp"
+
+        mkdir -p "$out_dir" || {
+            echo "Error: Cannot create '$out_dir' directory" >&2
+            return 1
+        }
+
+        if magick "$input" -quality 90 -define webp:method=$WEBP_METHOD -define webp:pass=$WEBP_PASS -define webp:use-sharp-yuv=1 "$output" 2>/dev/null; then
+            echo "✅ Created: $output"
+            return 0
+        else
+            echo "Error: Optimization failed for $input" >&2
+            return 1
+        fi
+    }
+
+    # Optimize to WebP with maximum quality settings
+    local WEBP_METHOD=6  # Compression method: 0=fast, 6=best compression (slower)
+    local WEBP_PASS=10   # Number of compression passes: higher = better compression (slower)
+
+    if [[ -f "$target" ]]; then
+        _process_single_optimize_to_webp "$target"
+        return $?
+    fi
+
+    if [[ ! -d "$target" ]]; then
+        echo "Error: Target '$target' must be a file or directory" >&2
         return 1
     fi
 
@@ -1037,10 +1106,6 @@ EOF
         echo "Error: Cannot create '$out_dir' directory" >&2
         return 1
     }
-
-    # Optimize to WebP with maximum quality settings
-    local WEBP_METHOD=6  # Compression method: 0=fast, 6=best compression (slower)
-    local WEBP_PASS=10   # Number of compression passes: higher = better compression (slower)
 
     if magick mogrify -path "$out_dir" -format webp -quality 90 -define webp:method=$WEBP_METHOD -define webp:pass=$WEBP_PASS -define webp:use-sharp-yuv=1 "${input_files[@]}" 2>/dev/null; then
         local count=$(ls -1 "$out_dir"/*.webp 2>/dev/null | wc -l | tr -d ' ')
