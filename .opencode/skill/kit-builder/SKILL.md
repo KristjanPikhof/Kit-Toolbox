@@ -320,6 +320,12 @@ source $KIT_EXT_DIR/loader.zsh
 - All editor shortcuts from `editor.conf`
 - All navigation shortcuts from `shortcuts.conf`
 
+**Loader/config behavior to preserve:**
+- Navigation and editor shortcuts are generated as direct shell functions, but those functions delegate to internal handlers instead of embedding target paths or editor commands.
+- Valid `shortcuts.conf` and `editor.conf` changes are picked up after reloading Kit. Do not make generated functions re-read config files on each invocation.
+- Existing user-defined functions win over generated shortcuts/editors, with a warning.
+- Editor commands are parsed into argv safely. Do not use `eval`; do not support shell operators, command substitution, or environment-variable expansion in `editor.conf` commands.
+
 **For functions with custom completion options:**
 
 If your function needs special tab completion (like `yt-download` completing `mp3|mp4`), edit the `_kit_get_custom_completion()` function in `completions/_kit`:
