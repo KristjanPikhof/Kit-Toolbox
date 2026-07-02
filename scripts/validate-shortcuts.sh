@@ -2,12 +2,21 @@
 # validate-shortcuts.sh - Validate shortcuts.conf file
 # Checks for duplicates, path existence, and function conflicts
 
+[[ -n "$ZSH_VERSION" ]] || { echo "Run with: zsh $0" >&2; exit 1; }
+
 # Detect directory where this script is located
 SCRIPT_DIR="${${(%):-%x}:A:h}"
 KIT_EXT_DIR="${KIT_EXT_DIR:-$(dirname "$SCRIPT_DIR")}"
 shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
 errors=0
 warnings=0
+
+if [[ -f "$KIT_EXT_DIR/lib/kit-core.zsh" ]]; then
+    source "$KIT_EXT_DIR/lib/kit-core.zsh" || exit 1
+else
+    echo "❌ Error: kit-core helpers not found at $KIT_EXT_DIR/lib/kit-core.zsh" >&2
+    exit 1
+fi
 
 if [[ ! -f "$shortcuts_file" ]]; then
     echo "❌ Error: shortcuts.conf not found at $shortcuts_file"
@@ -20,9 +29,16 @@ echo ""
 declare -A seen_shortcuts
 declare -a path_issues
 
-while IFS='|' read -r name shortcut_path desc; do
-    [[ "$name" =~ ^# ]] && continue
+while IFS= read -r line || [[ -n "$line" ]]; do
+    name="" shortcut_path="" desc=""
+    _kit_parse_config_line "$line" name shortcut_path desc || continue
     [[ -z "$name" ]] && continue
+
+    if ! _kit_validate_shell_identifier "$name"; then
+        echo "Checking '$name': ❌ Invalid shortcut name"
+        errors=$((errors + 1))
+        continue
+    fi
 
     echo -n "Checking '$name': "
 

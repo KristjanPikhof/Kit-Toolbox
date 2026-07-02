@@ -54,6 +54,30 @@ KIT_NAV_ALIASES=()
 # Only initialize if not already set (for clean re-source support)
 (( ! ${+KIT_NAV_FUNCTIONS_CREATED} )) && KIT_NAV_FUNCTIONS_CREATED=()
 (( ! ${+KIT_NAV_TARGETS} )) && typeset -gA KIT_NAV_TARGETS=()
+(( ! ${+KIT_NAV_DESCS} )) && typeset -gA KIT_NAV_DESCS=()
+
+_kit_disable_kit_shortcuts() {
+    local name
+    for name in "${KIT_NAV_FUNCTIONS_CREATED[@]}"; do
+        unfunction "$name" 2>/dev/null
+        unset "KIT_NAV_TARGETS[$name]"
+        unset "KIT_NAV_DESCS[$name]"
+    done
+    KIT_NAV_FUNCTIONS_CREATED=()
+}
+
+_kit_prune_kit_shortcuts() {
+    local -a active_names=("$@")
+    local name
+    for name in "${KIT_NAV_FUNCTIONS_CREATED[@]}"; do
+        if (( ! active_names[(Ie)$name] )); then
+            unfunction "$name" 2>/dev/null
+            unset "KIT_NAV_TARGETS[$name]"
+            unset "KIT_NAV_DESCS[$name]"
+        fi
+    done
+    KIT_NAV_FUNCTIONS_CREATED=("${active_names[@]}")
+}
 
 _kit_run_shortcut() {
     local shortcut_name="$1"
@@ -101,17 +125,26 @@ _kit_validate_path() {
 _kit_generate_shortcuts() {
     local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
     local auto_generate="${KIT_AUTO_SHORTCUTS:-true}"
+    local -a active_names=()
+    local conflicts=0 entry name shortcut_path desc
 
-    [[ "$auto_generate" != "true" ]] && return 0
-    [[ ! -f "$shortcuts_file" ]] && return 0
+    KIT_NAV_ALIASES=()
 
-    local conflicts=0
+    if [[ "$auto_generate" != "true" ]]; then
+        _kit_disable_kit_shortcuts
+        return 0
+    fi
 
-    while IFS='|' read -r name shortcut_path desc; do
-        [[ "$name" =~ ^# ]] && continue
+    if [[ ! -f "$shortcuts_file" ]]; then
+        _kit_prune_kit_shortcuts
+        return 0
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        name="" shortcut_path="" desc=""
+        _kit_parse_config_line "$line" name shortcut_path desc || continue
         [[ -z "$name" ]] && continue
 
-        # Validate shortcut name is a safe shell identifier
         if ! _kit_validate_shell_identifier "$name"; then
             echo "❌ Error: Invalid shortcut name '$name' in shortcuts.conf. Must be a valid shell identifier (letters, digits, underscore, not starting with digit)." >&2
             conflicts=$((conflicts + 1))
@@ -137,8 +170,10 @@ _kit_generate_shortcuts() {
             if (( ${KIT_NAV_FUNCTIONS_CREATED[(Ie)$name]} )); then
                 # Function was created by kit on previous load - silently redefine to update config changes
                 KIT_NAV_TARGETS[$name]="$shortcut_path"
+                KIT_NAV_DESCS[$name]="$desc"
                 eval "$name() { _kit_run_shortcut $name; }"
                 KIT_NAV_ALIASES+=("$name")
+                active_names+=("$name")
                 continue
             fi
             # User-defined function conflicts with kit shortcut - warn user
@@ -148,12 +183,14 @@ _kit_generate_shortcuts() {
         fi
 
         KIT_NAV_TARGETS[$name]="$shortcut_path"
+        KIT_NAV_DESCS[$name]="$desc"
         eval "$name() { _kit_run_shortcut $name; }"
 
-        # Track that this function was created by kit
-        KIT_NAV_FUNCTIONS_CREATED+=("$name")
+        active_names+=("$name")
         KIT_NAV_ALIASES+=("$name")
     done < "$shortcuts_file"
+
+    _kit_prune_kit_shortcuts "${active_names[@]}"
 
     if [[ $conflicts -gt 0 ]]; then
         echo "❌ Found $conflicts shortcut conflict(s). Please fix shortcuts.conf" >&2
@@ -171,6 +208,29 @@ KIT_EDITOR_ALIASES=()
 (( ! ${+KIT_EDITOR_FUNCTIONS_CREATED} )) && KIT_EDITOR_FUNCTIONS_CREATED=()
 (( ! ${+KIT_EDITOR_COMMANDS} )) && typeset -gA KIT_EDITOR_COMMANDS=()
 (( ! ${+KIT_EDITOR_DESCS} )) && typeset -gA KIT_EDITOR_DESCS=()
+
+_kit_disable_kit_editors() {
+    local name
+    for name in "${KIT_EDITOR_FUNCTIONS_CREATED[@]}"; do
+        unfunction "$name" 2>/dev/null
+        unset "KIT_EDITOR_COMMANDS[$name]"
+        unset "KIT_EDITOR_DESCS[$name]"
+    done
+    KIT_EDITOR_FUNCTIONS_CREATED=()
+}
+
+_kit_prune_kit_editors() {
+    local -a active_names=("$@")
+    local name
+    for name in "${KIT_EDITOR_FUNCTIONS_CREATED[@]}"; do
+        if (( ! active_names[(Ie)$name] )); then
+            unfunction "$name" 2>/dev/null
+            unset "KIT_EDITOR_COMMANDS[$name]"
+            unset "KIT_EDITOR_DESCS[$name]"
+        fi
+    done
+    KIT_EDITOR_FUNCTIONS_CREATED=("${active_names[@]}")
+}
 
 _kit_run_editor() {
     local editor_name="$1"
@@ -213,40 +273,35 @@ _kit_run_editor() {
     "${editor_argv[@]}" "$target"
 }
 
-_kit_validate_editor_command() {
-    local cmd="$1"
-    # Basic validation: editor commands should only contain safe characters
-    # Allow: alphanumeric, spaces, tabs, slashes, dashes, dots, underscores, quotes
-    # Reject: command substitution, variable expansion, pipes, redirects, backticks, arithmetic expansion
-    if [[ "$cmd" == *'`'* ]] || [[ "$cmd" == *'$('* ]] || [[ "$cmd" == *'$['* ]] || \
-       [[ "$cmd" == *'|'* ]] || [[ "$cmd" == *'>'* ]] || [[ "$cmd" == *'<'* ]] || \
-       [[ "$cmd" == *'&&'* ]] || [[ "$cmd" == *';'* ]]; then
-        return 1
-    fi
-    return 0
-}
-
 _kit_generate_editors() {
     local editors_file="$KIT_EXT_DIR/editor.conf"
     local auto_generate="${KIT_AUTO_EDITORS:-true}"
+    local -a active_names=()
+    local conflicts=0 name editor_cmd desc line
 
-    [[ "$auto_generate" != "true" ]] && return 0
-    [[ ! -f "$editors_file" ]] && return 0
+    KIT_EDITOR_ALIASES=()
 
-    local conflicts=0
+    if [[ "$auto_generate" != "true" ]]; then
+        _kit_disable_kit_editors
+        return 0
+    fi
 
-    while IFS='|' read -r name editor_cmd desc; do
-        [[ "$name" =~ ^# ]] && continue
+    if [[ ! -f "$editors_file" ]]; then
+        _kit_prune_kit_editors
+        return 0
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        name="" editor_cmd="" desc=""
+        _kit_parse_config_line "$line" name editor_cmd desc || continue
         [[ -z "$name" ]] && continue
 
-        # Validate editor name is a safe shell identifier
         if ! _kit_validate_shell_identifier "$name"; then
             echo "❌ Error: Invalid editor name '$name' in editor.conf. Must be a valid shell identifier (letters, digits, underscore, not starting with digit)." >&2
             conflicts=$((conflicts + 1))
             continue
         fi
 
-        # Validate editor command is safe
         if ! _kit_validate_editor_command "$editor_cmd"; then
             echo "❌ Error: Invalid editor command for '$name'. Command contains unsafe characters." >&2
             conflicts=$((conflicts + 1))
@@ -259,18 +314,15 @@ _kit_generate_editors() {
             continue
         fi
 
-        # Skip if function already exists - handle differently based on origin
         if declare -f "$name" > /dev/null 2>&1; then
-            # Use explicit array index check for reliable substring-safe matching
             if (( ${KIT_EDITOR_FUNCTIONS_CREATED[(Ie)$name]} )); then
-                # Function was created by kit on previous load - silently redefine to update config changes
                 KIT_EDITOR_COMMANDS[$name]="$editor_cmd"
                 KIT_EDITOR_DESCS[$name]="$desc"
                 eval "$name() { _kit_run_editor $name \"\$@\"; }"
                 KIT_EDITOR_ALIASES+=("$name")
+                active_names+=("$name")
                 continue
             fi
-            # User-defined function conflicts with kit editor - warn user
             echo "⚠️  Warning: Editor '$name' conflicts with existing function - using existing function" >&2
             KIT_EDITOR_ALIASES+=("$name")
             continue
@@ -280,10 +332,11 @@ _kit_generate_editors() {
         KIT_EDITOR_DESCS[$name]="$desc"
         eval "$name() { _kit_run_editor $name \"\$@\"; }"
 
-        # Track that this function was created by kit
-        KIT_EDITOR_FUNCTIONS_CREATED+=("$name")
+        active_names+=("$name")
         KIT_EDITOR_ALIASES+=("$name")
     done < "$editors_file"
+
+    _kit_prune_kit_editors "${active_names[@]}"
 
     if [[ $conflicts -gt 0 ]]; then
         echo "❌ Found $conflicts editor conflict(s). Please fix editor.conf" >&2
@@ -435,9 +488,11 @@ kit() {
         if [[ ${#KIT_NAV_ALIASES[@]} -gt 0 ]]; then
             echo "${CYAN}🚀 Quick Navigation${NC}"
             echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
-            local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
             for alias_name in "${KIT_NAV_ALIASES[@]}"; do
-                local desc=$(awk -F'|' -v name="$alias_name" '!/^#/ && NF > 0 && $1 == name {print $3; exit}' "$shortcuts_file" 2>/dev/null || echo "")
+                local desc="${KIT_NAV_DESCS[$alias_name]}"
+                if [[ -z "$desc" ]]; then
+                    desc=$(_kit_find_shortcut "$KIT_EXT_DIR/shortcuts.conf" "$alias_name" | cut -d'|' -f3-)
+                fi
                 printf "  ${GREEN}%-22s${NC} ${DIM}%s${NC}\n" "$alias_name" "$desc"
             done
             echo ""
@@ -446,9 +501,11 @@ kit() {
         if [[ ${#KIT_EDITOR_ALIASES[@]} -gt 0 ]]; then
             echo "${CYAN}✏️  Editor Shortcuts${NC}"
             echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
-            local editors_file="$KIT_EXT_DIR/editor.conf"
             for editor_name in "${KIT_EDITOR_ALIASES[@]}"; do
-                local desc=$(awk -F'|' -v name="$editor_name" '!/^#/ && NF > 0 && $1 == name {print $3; exit}' "$editors_file" 2>/dev/null || echo "")
+                local desc="${KIT_EDITOR_DESCS[$editor_name]}"
+                if [[ -z "$desc" ]]; then
+                    desc=$(_kit_find_editor "$KIT_EXT_DIR/editor.conf" "$editor_name" | cut -d'|' -f3-)
+                fi
                 printf "  ${GREEN}%-22s${NC} ${DIM}%s${NC}\n" "$editor_name" "$desc"
             done
             echo ""

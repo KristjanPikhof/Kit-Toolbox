@@ -39,6 +39,15 @@ assert_status "identifier rejects hyphen" "$rc" 1
 _kit_validate_shell_identifier "bad name"; rc=$?
 assert_status "identifier rejects spaces" "$rc" 1
 
+_kit_validate_editor_command 'code --wait'; rc=$?
+assert_status "editor validation accepts safe command" "$rc" 0
+_kit_validate_editor_command 'open -a "Zed"'; rc=$?
+assert_status "editor validation accepts quoted app name" "$rc" 0
+_kit_validate_editor_command '$HOME/bin/editor'; rc=$?
+assert_status "editor validation rejects dollar sign" "$rc" 1
+_kit_validate_editor_command 'fake-editor; touch pwned'; rc=$?
+assert_status "editor validation rejects semicolon" "$rc" 1
+
 name="" value="" desc=""
 _kit_parse_config_line "edit|fake-editor '--classic mode'|Description with spaces and | pipe" name value desc; rc=$?
 assert_status "parse accepts pipe-delimited config line" "$rc" 0

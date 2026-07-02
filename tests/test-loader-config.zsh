@@ -128,6 +128,23 @@ out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; print -r -- "stale|'
 assert_contains "config change without re-source keeps old embedded shortcut path" "$out" "$TMP/target-one"
 assert_not_contains "config change without re-source does not use new shortcut path" "$out" "$TMP/target-two"
 
+write_configs "gone|$TMP/target-one|Will remove
+" ""
+out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; print -r -- "" > "$KIT_EXT_DIR/shortcuts.conf"; source "$KIT_EXT_DIR/loader.zsh" >/dev/null; declare -f gone >/dev/null; print -r -- func:$?; gone >/dev/null 2>&1; print -r -- gone_rc:$?')
+assert_contains "removed shortcut is unfunctioned on re-source" "$out" "func:1"
+assert_contains "removed shortcut no longer runs after re-source" "$out" "gone_rc:127"
+
+write_configs "pipeproj|$TMP/target-one|Desc with | pipe
+" ""
+out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; kit -h')
+assert_contains "kit -h preserves pipe character in shortcut description" "$out" "Desc with | pipe"
+
+write_configs "stay|$TMP/target-one|Stay shortcut
+" ""
+out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; stay >/dev/null; print -r -- pwd1:$PWD; KIT_AUTO_SHORTCUTS=false source "$KIT_EXT_DIR/loader.zsh" >/dev/null; declare -f stay >/dev/null; print -r -- func:$?; stay >/dev/null 2>&1; print -r -- stay_rc:$?')
+assert_contains "KIT_AUTO_SHORTCUTS=false mid-session removes shortcut function" "$out" "func:1"
+assert_contains "KIT_AUTO_SHORTCUTS=false mid-session blocks direct shortcut call" "$out" "stay_rc:127"
+
 # Editor behavior.
 write_configs "proj|$TMP/target-one|Project shortcut
 " "edit|fake-editor|Fake editor
@@ -174,11 +191,14 @@ assert_contains "KIT_AUTO_EDITORS=false makes kit editor return 127" "$out" "kit
 
 write_configs "" "1edit|fake-editor|Invalid
 evil|fake-editor; touch $TMP/editor-pwned|Unsafe
+dollar|\$TMP/bin/fake-editor|Dollar variable
 "
-out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh"; declare -f 1edit >/dev/null; print -r -- bad:$?; declare -f evil >/dev/null; print -r -- evil:$?')
+out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh"; declare -f 1edit >/dev/null; print -r -- bad:$?; declare -f evil >/dev/null; print -r -- evil:$?; declare -f dollar >/dev/null; print -r -- dollar:$?')
 assert_contains "invalid editor name rejected" "$out" "Invalid editor name '1edit'"
 assert_contains "unsafe editor command rejected" "$out" "Invalid editor command"
 assert_contains "unsafe editor has no function" "$out" "evil:1"
+assert_contains "editor command with dollar sign rejected" "$out" "Invalid editor command"
+assert_contains "dollar editor has no function" "$out" "dollar:1"
 assert_file_absent "unsafe editor command did not execute" "$TMP/editor-pwned"
 
 write_configs "" "dupeedit|fake-editor --first|First editor
@@ -201,6 +221,9 @@ write_configs "" "snapedit|fake-editor --old|Snapshot editor
 out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; print -r -- "snapedit|fake-editor --new|Snapshot editor changed" > "$KIT_EXT_DIR/editor.conf"; snapedit existing.txt; print -r -- LOG; cat "$KIT_FAKE_EDITOR_LOG"')
 assert_contains "editor config change without re-source keeps old embedded command" "$out" "CALL:fake-editor:argv[1]=--old"
 assert_not_contains "editor config change without re-source does not use new command" "$out" "--new"
+
+out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; print -r -- "" > "$KIT_EXT_DIR/editor.conf"; source "$KIT_EXT_DIR/loader.zsh" >/dev/null; declare -f snapedit >/dev/null; print -r -- func:$?')
+assert_contains "removed editor is unfunctioned on re-source" "$out" "func:1"
 
 write_configs "" "resedit|fake-editor --old|Resourced editor
 "

@@ -187,7 +187,7 @@ kit kit        # Navigate to kit-toolkit directory
 
 Kit also creates direct shell functions for these shortcuts after the loader is sourced, so `dev` and `kit dev` both work unless that name already belongs to another function. If there is a conflict, the existing function wins and Kit prints a warning.
 
-Shortcut wrappers use a source-time registry. Valid shortcut changes are picked up after you reload Kit (`source ~/.zshrc` or `source "$KIT_EXT_DIR/loader.zsh"`). For removals or invalid entries, start a fresh shell or remove the old function manually if it was already generated.
+Shortcut wrappers use a source-time registry. Valid shortcut changes are picked up after you reload Kit (`source ~/.zshrc` or `source "$KIT_EXT_DIR/loader.zsh"`). Removed shortcuts are unregistered on re-source. Config edits without re-sourcing keep the previous registry until you reload.
 
 **Deprecated:** `kit goto <name>` is deprecated. Use shortcuts directly: `kit <name>`
 
@@ -223,7 +223,7 @@ quoted|fake-editor '--one argument'|Example with a quoted flag value
 
 For safety, editor commands do not support shell operators, command substitution, or environment-variable expansion. Use a command on `PATH` or an absolute executable path if the program name contains spaces.
 
-As with navigation shortcuts, Kit creates direct editor functions after the loader is sourced, so `code README.md` and `kit code README.md` both work. Existing functions are not overwritten. Valid editor config changes are picked up after you reload Kit; use a fresh shell for removals or invalid entries that were already generated.
+As with navigation shortcuts, Kit creates direct editor functions after the loader is sourced, so `code README.md` and `kit code README.md` both work. Existing functions are not overwritten. Valid editor config changes are picked up after you reload Kit; removed editors are unregistered on re-source.
 
 Create your `editor.conf` from the example:
 ```bash
@@ -263,6 +263,9 @@ kit-toolkit/
 ├── README.md                 # This file
 ├── CONTRIBUTING.md           # Guide for adding new functions
 │
+├── lib/                      # Shared internal helpers
+│   └── kit-core.zsh          # Config parsing and validation helpers
+│
 ├── functions/                # Function modules
 │   ├── images.sh             # Image processing functions
 │   ├── media.sh              # Media processing functions
@@ -278,7 +281,14 @@ kit-toolkit/
 │   ├── new-function.sh       # Template generator for new functions
 │   ├── validate-pattern.sh   # Validator for pattern compliance
 │   ├── generate-completions.sh  # Completion system verifier (system is fully dynamic)
-│   └── validate-shortcuts.sh # Validate shortcuts configuration
+│   ├── validate-shortcuts.sh # Validate shortcuts configuration
+│   └── validate-editors.sh   # Validate editor shortcuts configuration
+│
+├── tests/                    # Test suite
+│   ├── run-tests.sh          # Main integration test runner
+│   ├── test-kit-core.zsh     # Hermetic kit-core helper tests
+│   ├── test-loader-config.zsh # Hermetic shortcut/editor dispatch tests
+│   └── test-discovery-output.zsh # Hermetic help/completion output tests
 │
 └── llm_prompts/              # AI development guides
     └── kit_pattern.md        # Complete pattern specification
@@ -520,7 +530,12 @@ cp shortcuts.conf.example shortcuts.conf
 
 Validate shortcuts for errors:
 ```bash
-./scripts/validate-shortcuts.sh
+zsh ./scripts/validate-shortcuts.sh
+```
+
+Validate editor shortcuts for errors:
+```bash
+zsh ./scripts/validate-editors.sh
 ```
 
 Disable auto-generation of shortcuts:
@@ -906,6 +921,9 @@ Use freely. Modify as needed.
   - Reworked generated navigation shortcuts to use a source-time registry and internal handler instead of embedding target paths in generated function bodies.
   - Reworked generated editor shortcuts to use a source-time registry and internal handler instead of embedding editor commands in generated function bodies.
   - Editor commands are parsed as argv safely, so quoted arguments such as `'--one argument'` now pass as one argument.
+  - Removed shortcuts/editors are unregistered on re-source; `KIT_AUTO_SHORTCUTS=false` and `KIT_AUTO_EDITORS=false` now disable kit-created functions when re-sourced.
+  - Config parsing preserves `|` characters in descriptions via `lib/kit-core.zsh`.
+  - Added `scripts/validate-editors.sh` and wired hermetic loader tests into `tests/run-tests.sh`.
   - Fixed validation scripts that used `local` at top level.
   - Added hermetic characterization tests for loader config, helper parsing, and discovery/completion behavior.
 - **v2.8.1** (2026-03-17)

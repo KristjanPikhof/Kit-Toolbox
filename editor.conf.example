@@ -29,6 +29,25 @@
 #     myeditor|/usr/bin/myeditor|MyEditor
 #
 # ============================================================================
+# SAFE COMMAND PARSING
+# ============================================================================
+#
+# Editor commands are parsed as argv, not evaluated as shell code.
+# Quoted arguments are supported:
+#   myeditor|myeditor '--safe mode'|Editor with quoted flag
+#
+# For safety, editor commands do NOT support:
+#   - Shell operators (;, &&, |, >, <)
+#   - Command substitution (`...`, $(...))
+#   - Environment-variable expansion ($HOME, $PATH, etc.)
+#
+# Use a command on PATH or an absolute executable path. Quote paths or flags
+# that contain spaces.
+#
+# Validate your config with:
+#   zsh ./scripts/validate-editors.sh
+#
+# ============================================================================
 # EXAMPLES - CUSTOMIZE THESE FOR YOUR EDITORS
 # ============================================================================
 

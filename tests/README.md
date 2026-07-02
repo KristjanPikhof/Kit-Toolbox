@@ -15,7 +15,7 @@ cd tests
 
 ## Test Overview
 
-The test suite verifies **39 tests** across all toolkit categories:
+The test suite verifies integration and characterization tests across all toolkit categories:
 
 | Category | Tests | Coverage |
 |----------|-------|----------|
@@ -23,6 +23,7 @@ The test suite verifies **39 tests** across all toolkit categories:
 | Media Processing | 9 | Help + functional tests for compress, remove-audio, convert-to-mp3, yt-download |
 | System Utilities | 5 | Help + functional tests for mklink, killports, update, uninstall |
 | Core & Navigation | 3 | Dispatcher, help, search, categories |
+| Loader Characterization | 3 | Hermetic kit-core, shortcut/editor dispatch, discovery/completion output |
 | File Listing | 4 | Help tests for list-files, list-all, list-reverse, list-tree |
 
 ## Test Stages
@@ -103,6 +104,15 @@ kit -h                    # Main help
 kit --list-categories     # List all categories
 kit --search resize       # Search functions
 ```
+
+**Loader characterization tests (hermetic, no external deps):**
+```bash
+zsh tests/test-kit-core.zsh
+zsh tests/test-loader-config.zsh
+zsh tests/test-discovery-output.zsh
+```
+
+These are also run automatically by `run-tests.sh`.
 
 ### Step 4: Cleanup Prompt
 
@@ -249,7 +259,10 @@ cd - >/dev/null
 
 ```
 tests/
-├── run-tests.sh          # Main test runner
+├── run-tests.sh          # Main test runner (integration + characterization)
+├── test-kit-core.zsh     # Hermetic kit-core helper tests
+├── test-loader-config.zsh # Hermetic shortcut/editor dispatch tests
+├── test-discovery-output.zsh # Hermetic help/completion output tests
 ├── README.md             # This file
 └── assets/               # Generated during test run (not in git)
     ├── images/           # Test images

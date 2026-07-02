@@ -13,6 +13,17 @@ _kit_validate_shell_identifier() {
     [[ "$name" =~ '^[a-zA-Z_][a-zA-Z0-9_]*$' ]]
 }
 
+_kit_validate_editor_command() {
+    local cmd="$1"
+    # Reject shell operators, substitution, variable expansion, and pipes.
+    if [[ "$cmd" == *'$'* ]] || [[ "$cmd" == *'`'* ]] || [[ "$cmd" == *'$('* ]] || \
+       [[ "$cmd" == *'$['* ]] || [[ "$cmd" == *'|'* ]] || [[ "$cmd" == *'>'* ]] || \
+       [[ "$cmd" == *'<'* ]] || [[ "$cmd" == *'&&'* ]] || [[ "$cmd" == *';'* ]]; then
+        return 1
+    fi
+    return 0
+}
+
 _kit_parse_config_line() {
     local line="$1" name_var="$2" value_var="$3" desc_var="$4"
     local parsed_name parsed_value parsed_desc remainder output_var

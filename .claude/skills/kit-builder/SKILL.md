@@ -322,9 +322,11 @@ source $KIT_EXT_DIR/loader.zsh
 
 **Loader/config behavior to preserve:**
 - Navigation and editor shortcuts are generated as direct shell functions, but those functions delegate to internal handlers instead of embedding target paths or editor commands.
-- Valid `shortcuts.conf` and `editor.conf` changes are picked up after reloading Kit. Do not make generated functions re-read config files on each invocation.
+- Valid `shortcuts.conf` and `editor.conf` changes are picked up after reloading Kit. Removed entries are unregistered on re-source. Do not make generated functions re-read config files on each invocation.
+- Setting `KIT_AUTO_SHORTCUTS=false` or `KIT_AUTO_EDITORS=false` before re-sourcing removes kit-created shortcut/editor functions for that session.
 - Existing user-defined functions win over generated shortcuts/editors, with a warning.
 - Editor commands are parsed into argv safely. Do not use `eval`; do not support shell operators, command substitution, or environment-variable expansion in `editor.conf` commands.
+- Config descriptions may contain `|` characters; use `lib/kit-core.zsh` parsers instead of naive `IFS='|'` splitting.
 
 **For functions with custom completion options:**
 

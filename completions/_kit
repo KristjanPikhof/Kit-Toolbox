@@ -2,6 +2,10 @@
 # Completion script for kit command (fully dynamic)
 # Provides tab-completion for function names, shortcuts, and arguments
 
+if (( ! ${+_KIT_CORE_ZSH_LOADED} )); then
+    [[ -n "$KIT_EXT_DIR" && -f "$KIT_EXT_DIR/lib/kit-core.zsh" ]] && source "$KIT_EXT_DIR/lib/kit-core.zsh"
+fi
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
@@ -25,11 +29,7 @@ _kit_get_editors() {
     local editors_file="$KIT_EXT_DIR/editor.conf"
     [[ -f "$editors_file" ]] || return 0
 
-    while IFS='|' read -r name cmd desc; do
-        [[ "$name" =~ ^# ]] && continue
-        [[ -z "$name" ]] && continue
-        echo "$name"
-    done < "$editors_file"
+    _kit_read_editor_entries "$editors_file" | cut -d'|' -f1
 }
 
 # Get navigation shortcuts from shortcuts.conf
@@ -37,11 +37,7 @@ _kit_get_shortcuts() {
     local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
     [[ -f "$shortcuts_file" ]] || return 0
 
-    while IFS='|' read -r name path desc; do
-        [[ "$name" =~ ^# ]] && continue
-        [[ -z "$name" ]] && continue
-        echo "$name"
-    done < "$shortcuts_file"
+    _kit_read_shortcut_entries "$shortcuts_file" | cut -d'|' -f1
 }
 
 # Build command list with descriptions
@@ -64,56 +60,44 @@ _kit_build_command_list() {
     # Add editor shortcuts from editor.conf
     local editors_file="$KIT_EXT_DIR/editor.conf"
     if [[ -f "$editors_file" ]]; then
-        while IFS='|' read -r name cmd desc; do
-            [[ "$name" =~ ^# ]] && continue
+        local entry name cmd desc remainder
+        while IFS= read -r entry; do
+            name="${entry%%|*}"
+            remainder="${entry#*|}"
+            cmd="${remainder%%|*}"
+            desc="${remainder#*|}"
             [[ -z "$name" ]] && continue
             commands_with_desc+=("$name:$desc")
-        done < "$editors_file"
+        done < <(_kit_read_editor_entries "$editors_file")
     fi
 
     # Add navigation shortcuts from shortcuts.conf
     local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
     if [[ -f "$shortcuts_file" ]]; then
-        while IFS='|' read -r name path desc; do
-            [[ "$name" =~ ^# ]] && continue
+        local entry name path desc remainder
+        while IFS= read -r entry; do
+            name="${entry%%|*}"
+            remainder="${entry#*|}"
+            path="${remainder%%|*}"
+            desc="${remainder#*|}"
             [[ -z "$name" ]] && continue
             commands_with_desc+=("$name:$desc")
-        done < "$shortcuts_file"
+        done < <(_kit_read_shortcut_entries "$shortcuts_file")
     fi
 
-    printf '%s\n' "$commands_with_desc[@]"
+    printf '%s\n' "${commands_with_desc[@]}"
 }
 
 # Check if a command is an editor shortcut
 _kit_is_editor() {
     local cmd="$1"
-    local editors_file="$KIT_EXT_DIR/editor.conf"
-    [[ -f "$editors_file" ]] || return 1
-
-    while IFS='|' read -r name editor_cmd desc; do
-        [[ "$name" =~ ^# ]] && continue
-        [[ -z "$name" ]] && continue
-        if [[ "$name" == "$cmd" ]]; then
-            return 0
-        fi
-    done < "$editors_file"
-    return 1
+    _kit_find_editor "$KIT_EXT_DIR/editor.conf" "$cmd" >/dev/null
 }
 
 # Check if a command is a navigation shortcut
 _kit_is_shortcut() {
     local cmd="$1"
-    local shortcuts_file="$KIT_EXT_DIR/shortcuts.conf"
-    [[ -f "$shortcuts_file" ]] || return 1
-
-    while IFS='|' read -r name path desc; do
-        [[ "$name" =~ ^# ]] && continue
-        [[ -z "$name" ]] && continue
-        if [[ "$name" == "$cmd" ]]; then
-            return 0
-        fi
-    done < "$shortcuts_file"
-    return 1
+    _kit_find_shortcut "$KIT_EXT_DIR/shortcuts.conf" "$cmd" >/dev/null
 }
 
 # Get custom completion options for specific commands
