@@ -1,4 +1,4 @@
-# Kit's Toolkit v2.8.1
+# Kit's Toolkit v2.9.0
 
 A modular, extensible shell function toolkit for macOS/Linux with auto-discovery, tab completion, and AI-friendly development patterns.
 
@@ -185,6 +185,10 @@ kit kit        # Navigate to kit-toolkit directory
 # ... and more, see `kit -h` for full list
 ```
 
+Kit also creates direct shell functions for these shortcuts after the loader is sourced, so `dev` and `kit dev` both work unless that name already belongs to another function. If there is a conflict, the existing function wins and Kit prints a warning.
+
+Shortcut wrappers use a source-time registry. Valid shortcut changes are picked up after you reload Kit (`source ~/.zshrc` or `source "$KIT_EXT_DIR/loader.zsh"`). For removals or invalid entries, start a fresh shell or remove the old function manually if it was already generated.
+
 **Deprecated:** `kit goto <name>` is deprecated. Use shortcuts directly: `kit <name>`
 
 ### ✏️ Editor Shortcuts
@@ -208,6 +212,18 @@ zed|open -a Zed|Zed editor (macOS)
 cursor|cursor|Cursor AI editor
 nvim|nvim|Neovim
 ```
+
+Editor commands are parsed safely as command arguments, not evaluated as shell code. Quoted arguments work:
+
+```bash
+zed|open -a "Zed"|Zed editor (macOS)
+app|/Applications/My\ Editor.app/Contents/MacOS/editor --safe-mode|Custom editor
+quoted|fake-editor '--one argument'|Example with a quoted flag value
+```
+
+For safety, editor commands do not support shell operators, command substitution, or environment-variable expansion. Use a command on `PATH` or an absolute executable path if the program name contains spaces.
+
+As with navigation shortcuts, Kit creates direct editor functions after the loader is sourced, so `code README.md` and `kit code README.md` both work. Existing functions are not overwritten. Valid editor config changes are picked up after you reload Kit; use a fresh shell for removals or invalid entries that were already generated.
 
 Create your `editor.conf` from the example:
 ```bash
@@ -844,6 +860,8 @@ sudo pacman -S yt-dlp ffmpeg lsd
 - **KIT_AUTO_SHORTCUTS** — Enable/disable auto-generation of navigation shortcuts (default: `true`)
 - **KIT_AUTO_EDITORS** — Enable/disable auto-generation of editor shortcuts (default: `true`)
 
+When `KIT_AUTO_SHORTCUTS=false` or `KIT_AUTO_EDITORS=false` is set before loading Kit in a fresh shell, those config-backed commands are not generated and do not appear in `kit -h`.
+
 **Note:** `KIT_EXT_DIR` is automatically set by the installer. The toolkit auto-detects its location, so it works from any directory.
 
 Example:
@@ -857,7 +875,7 @@ export KIT_AUTO_EDITORS=false
 
 Functions are **pre-loaded** at shell startup for instant access. Loading takes ~50ms for all functions.
 
-For very large function sets, the dispatcher uses lazy-loading fallback to avoid overhead.
+Generated shortcut and editor functions are thin wrappers around internal handlers. Their target paths and editor commands are stored when Kit is sourced, so calls do not re-parse config files every time.
 
 ## Documentation
 
@@ -872,6 +890,7 @@ Use freely. Modify as needed.
 
 ## Version
 
+**v2.9.0** — Safer shortcut/editor dispatch and loader characterization tests
 **v2.8.1** — Installer now uses shared dependency checks
 **v2.8.0** — Removed unusable `ccflare` command
 **v2.7.1** — Version-aware ImageMagick dependency checks
@@ -883,6 +902,12 @@ Use freely. Modify as needed.
 **v2.4.0** — Configurable editor shortcuts
 
 ### Changelog
+- **v2.9.0** (2026-07-03)
+  - Reworked generated navigation shortcuts to use a source-time registry and internal handler instead of embedding target paths in generated function bodies.
+  - Reworked generated editor shortcuts to use a source-time registry and internal handler instead of embedding editor commands in generated function bodies.
+  - Editor commands are parsed as argv safely, so quoted arguments such as `'--one argument'` now pass as one argument.
+  - Fixed validation scripts that used `local` at top level.
+  - Added hermetic characterization tests for loader config, helper parsing, and discovery/completion behavior.
 - **v2.8.1** (2026-03-17)
   - 🔧 `install.sh` now uses the shared dependency catalog and version-aware ImageMagick checks from `deps.sh`
   - 🧭 Added explicit invalid-usage handling to `goto` without changing its no-arg help behavior

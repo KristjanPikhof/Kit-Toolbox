@@ -19,6 +19,14 @@ if [[ ! -d "$KIT_EXT_DIR" ]]; then
     return 1
 fi
 
+# Load shared internal helpers
+if [[ -f "$KIT_EXT_DIR/lib/kit-core.zsh" ]]; then
+    source "$KIT_EXT_DIR/lib/kit-core.zsh" || return 1
+else
+    echo "Error: Kit core helpers not found at $KIT_EXT_DIR/lib/kit-core.zsh" >&2
+    return 1
+fi
+
 # Read version from VERSION file
 KIT_VERSION="${KIT_VERSION:-unknown}"
 if [[ -f "$KIT_EXT_DIR/VERSION" ]]; then
@@ -45,28 +53,37 @@ fi
 KIT_NAV_ALIASES=()
 # Only initialize if not already set (for clean re-source support)
 (( ! ${+KIT_NAV_FUNCTIONS_CREATED} )) && KIT_NAV_FUNCTIONS_CREATED=()
-_kit_validate_shell_identifier() {
-    local name="$1"
-    # Valid shell identifiers: start with letter or underscore, followed by alphanumeric/underscore
-    [[ "$name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]
+(( ! ${+KIT_NAV_TARGETS} )) && typeset -gA KIT_NAV_TARGETS=()
+
+_kit_run_shortcut() {
+    local shortcut_name="$1"
+    if (( ! ${+KIT_NAV_TARGETS[$shortcut_name]} )); then
+        echo "Error: Shortcut '$shortcut_name' not found" >&2
+        return 1
+    fi
+
+    local target_path="${KIT_NAV_TARGETS[$shortcut_name]}"
+
+    target_path="${target_path/\~/$HOME}"
+    cd "$target_path" && ls
 }
 
 _kit_validate_path() {
-    local path="$1"
+    local shortcut_path="$1"
 
     # Check for path traversal attempts
-    if [[ "$path" == *"../"* ]] || [[ "$path" == *"/.."* ]]; then
+    if [[ "$shortcut_path" == *"../"* ]] || [[ "$shortcut_path" == *"/.."* ]]; then
         return 1
     fi
 
     # Allow ~/ prefix for home directory with subpath, reject bare ~ or ~user
-    if [[ "$path" == "~" ]] || [[ "$path" == "~/"* ]]; then
+    if [[ "$shortcut_path" == "~" ]] || [[ "$shortcut_path" == "~/"* ]]; then
         # Only allow ~/... (home directory with subpath)
-        if [[ "$path" != "~/"* ]]; then
+        if [[ "$shortcut_path" != "~/"* ]]; then
             # Reject bare ~
             return 1
         fi
-    elif [[ "$path" == "~"* ]]; then
+    elif [[ "$shortcut_path" == "~"* ]]; then
         # Reject ~user patterns (e.g., ~otheruser/path)
         return 1
     fi
@@ -74,7 +91,7 @@ _kit_validate_path() {
     # Reject shell expansion patterns that could enable command injection
     # We don't require existence here since paths may be created later
     # But we do want to catch obviously malicious patterns
-    if [[ "$path" == *'$'* ]] || [[ "$path" == *'`'* ]] || [[ "$path" == *'$('* ]]; then
+    if [[ "$shortcut_path" == *'$'* ]] || [[ "$shortcut_path" == *'`'* ]] || [[ "$shortcut_path" == *'$('* ]]; then
         return 1
     fi
 
@@ -119,8 +136,8 @@ _kit_generate_shortcuts() {
             # Use explicit array index check for reliable substring-safe matching
             if (( ${KIT_NAV_FUNCTIONS_CREATED[(Ie)$name]} )); then
                 # Function was created by kit on previous load - silently redefine to update config changes
-                local escaped_path="${shortcut_path//\'/\\\'}"
-                eval "$name() { local shortcut_name='$name'; local target_path='$escaped_path'; target_path=\"\${target_path/\\~/$HOME}\"; cd \"\$target_path\" && ls; }"
+                KIT_NAV_TARGETS[$name]="$shortcut_path"
+                eval "$name() { _kit_run_shortcut $name; }"
                 KIT_NAV_ALIASES+=("$name")
                 continue
             fi
@@ -130,8 +147,8 @@ _kit_generate_shortcuts() {
             continue
         fi
 
-        local escaped_path="${shortcut_path//\'/\\\'}"
-        eval "$name() { local shortcut_name='$name'; local target_path='$escaped_path'; target_path=\"\${target_path/\\~/$HOME}\"; cd \"\$target_path\" && ls; }"
+        KIT_NAV_TARGETS[$name]="$shortcut_path"
+        eval "$name() { _kit_run_shortcut $name; }"
 
         # Track that this function was created by kit
         KIT_NAV_FUNCTIONS_CREATED+=("$name")
@@ -152,6 +169,50 @@ _kit_generate_shortcuts
 KIT_EDITOR_ALIASES=()
 # Only initialize if not already set (for clean re-source support)
 (( ! ${+KIT_EDITOR_FUNCTIONS_CREATED} )) && KIT_EDITOR_FUNCTIONS_CREATED=()
+(( ! ${+KIT_EDITOR_COMMANDS} )) && typeset -gA KIT_EDITOR_COMMANDS=()
+(( ! ${+KIT_EDITOR_DESCS} )) && typeset -gA KIT_EDITOR_DESCS=()
+
+_kit_run_editor() {
+    local editor_name="$1"
+    shift
+
+    local editor_cmd="${KIT_EDITOR_COMMANDS[$editor_name]}"
+    local desc="${KIT_EDITOR_DESCS[$editor_name]}"
+
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+        echo "Usage: kit $editor_name <file|folder>"
+        echo "Description: Open file or folder with $desc"
+        echo ""
+        echo "Examples:"
+        echo "  kit $editor_name myfile.md"
+        echo "  kit $editor_name ."
+        return 0
+    fi
+
+    if [[ -z "$1" ]]; then
+        echo "Error: Missing file or folder path" >&2
+        echo "Usage: kit $editor_name <file|folder>" >&2
+        return 2
+    fi
+
+    local target="$1"
+
+    # Check if target exists (skip for current directory)
+    if [[ ! -e "$target" && "$target" != "." ]]; then
+        echo "Error: '$target' does not exist" >&2
+        return 1
+    fi
+
+    local -a editor_argv
+    editor_argv=("${(@Q)${(z)editor_cmd}}")
+    if [[ ${#editor_argv[@]} -eq 0 ]]; then
+        echo "Error: Editor '$editor_name' command is empty" >&2
+        return 1
+    fi
+
+    "${editor_argv[@]}" "$target"
+}
+
 _kit_validate_editor_command() {
     local cmd="$1"
     # Basic validation: editor commands should only contain safe characters
@@ -203,35 +264,9 @@ _kit_generate_editors() {
             # Use explicit array index check for reliable substring-safe matching
             if (( ${KIT_EDITOR_FUNCTIONS_CREATED[(Ie)$name]} )); then
                 # Function was created by kit on previous load - silently redefine to update config changes
-                local escaped_cmd="${editor_cmd//\'/\'\\\'\'}"
-                eval "$name() {
-                    if [[ \"\$1\" == \"-h\" || \"\$1\" == \"--help\" ]]; then
-                        echo \"Usage: kit $name <file|folder>\"
-                        echo \"Description: Open file or folder with $desc\"
-                        echo \"\"
-                        echo \"Examples:\"
-                        echo \"  kit $name myfile.md\"
-                        echo \"  kit $name .\"
-                        return 0
-                    fi
-
-                    if [[ -z \"\$1\" ]]; then
-                        echo \"Error: Missing file or folder path\" >&2
-                        echo \"Usage: kit $name <file|folder>\" >&2
-                        return 2
-                    fi
-
-                    local target=\"\$1\"
-
-                    # Check if target exists (skip for current directory)
-                    if [[ ! -e \"\$target\" && \"\$target\" != \".\" ]]; then
-                        echo \"Error: '\$target' does not exist\" >&2
-                        return 1
-                    fi
-
-                    # Open with the editor
-                    $escaped_cmd \"\$target\"
-                }"
+                KIT_EDITOR_COMMANDS[$name]="$editor_cmd"
+                KIT_EDITOR_DESCS[$name]="$desc"
+                eval "$name() { _kit_run_editor $name \"\$@\"; }"
                 KIT_EDITOR_ALIASES+=("$name")
                 continue
             fi
@@ -241,38 +276,9 @@ _kit_generate_editors() {
             continue
         fi
 
-        # Escape single quotes in command
-        local escaped_cmd="${editor_cmd//\'/\'\\\'\'}"
-
-        # Generate function that opens files/folders with the editor
-        eval "$name() {
-            if [[ \"\$1\" == \"-h\" || \"\$1\" == \"--help\" ]]; then
-                echo \"Usage: kit $name <file|folder>\"
-                echo \"Description: Open file or folder with $desc\"
-                echo \"\"
-                echo \"Examples:\"
-                echo \"  kit $name myfile.md\"
-                echo \"  kit $name .\"
-                return 0
-            fi
-
-            if [[ -z \"\$1\" ]]; then
-                echo \"Error: Missing file or folder path\" >&2
-                echo \"Usage: kit $name <file|folder>\" >&2
-                return 2
-            fi
-
-            local target=\"\$1\"
-
-            # Check if target exists (skip for current directory)
-            if [[ ! -e \"\$target\" && \"\$target\" != \".\" ]]; then
-                echo \"Error: '\$target' does not exist\" >&2
-                return 1
-            fi
-
-            # Open with the editor
-            $escaped_cmd \"\$target\"
-        }"
+        KIT_EDITOR_COMMANDS[$name]="$editor_cmd"
+        KIT_EDITOR_DESCS[$name]="$desc"
+        eval "$name() { _kit_run_editor $name \"\$@\"; }"
 
         # Track that this function was created by kit
         KIT_EDITOR_FUNCTIONS_CREATED+=("$name")

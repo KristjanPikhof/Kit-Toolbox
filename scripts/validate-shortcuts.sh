@@ -20,13 +20,13 @@ echo ""
 declare -A seen_shortcuts
 declare -a path_issues
 
-while IFS='|' read -r name path desc; do
+while IFS='|' read -r name shortcut_path desc; do
     [[ "$name" =~ ^# ]] && continue
     [[ -z "$name" ]] && continue
 
     echo -n "Checking '$name': "
 
-    local has_error=0
+    has_error=0
 
     if [[ -v "seen_shortcuts[$name]" ]]; then
         echo "❌ Duplicate shortcut name"
@@ -36,7 +36,7 @@ while IFS='|' read -r name path desc; do
         seen_shortcuts[$name]=1
     fi
 
-    local expanded_path="${path/\~/$HOME}"
+    expanded_path="${shortcut_path/\~/$HOME}"
     if [[ ! -d "$expanded_path" ]]; then
         echo -n "❌ Path does not exist "
         has_error=1
@@ -78,9 +78,9 @@ if [[ $errors -gt 0 ]]; then
     if [[ ${#path_issues[@]} -gt 0 ]]; then
         echo "Path issues:"
         for issue in "${path_issues[@]}"; do
-            local name="${issue%%|*}"
-            local path="${issue##*|}"
-            echo "  • $name: $path"
+            issue_name="${issue%%|*}"
+            issue_path="${issue##*|}"
+            echo "  • $issue_name: $issue_path"
         done
     fi
     exit 1
