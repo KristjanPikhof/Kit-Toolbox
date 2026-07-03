@@ -569,6 +569,16 @@ run_test "kit --list-categories: lists categories" "kit --list-categories | grep
 run_test "kit --search: search functions" "kit --search resize | grep -q img-resize"
 
 # ============================================================================
+# LOADER CHARACTERIZATION TESTS
+# ============================================================================
+
+print_section "Loader Characterization Tests"
+
+run_test "kit-core helpers" "zsh $SCRIPT_DIR/test-kit-core.zsh"
+run_test "loader shortcut/editor dispatch" "zsh $SCRIPT_DIR/test-loader-config.zsh"
+run_test "discovery and completion output" "zsh $SCRIPT_DIR/test-discovery-output.zsh"
+
+# ============================================================================
 # FILE LISTING TESTS
 # ============================================================================
 

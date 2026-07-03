@@ -252,7 +252,7 @@ See [reference.md](reference.md) for detailed troubleshooting, including:
 
 ## Version
 
-Kit Builder v1.0 - Created for Kit's Toolkit v2.0
+Kit Builder v1.1 - Updated for Kit's Toolkit v2.9.0 shortcut/editor handler model
 
 ## License
 
