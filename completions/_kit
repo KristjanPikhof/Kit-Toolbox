@@ -109,12 +109,16 @@ _kit_get_custom_completion() {
 
     case "$cmd" in
         yt-download)
-            if [[ $pos -eq 3 ]]; then
-                _values 'format' 'mp3' 'mp4'
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
                 return 0
             fi
             if [[ "$current_word" == -* ]]; then
                 _values 'options' '-o' '--output' '-f' '--force' '-v' '--verbose'
+                return 0
+            fi
+            if [[ $pos -eq 3 ]]; then
+                _values 'format' 'mp3' 'mp4'
                 return 0
             fi
             if [[ $pos -eq 5 && "${words[3]:-}" == "mp3" ]]; then
@@ -127,12 +131,20 @@ _kit_get_custom_completion() {
                 _values 'MP3 preset' 'speech' 'compact' 'standard' 'high' 'maximum'
                 return 0
             fi
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
+                return 0
+            fi
             if [[ "$current_word" == -* ]]; then
                 _values 'options' '-p' '--preset' '-b' '--bitrate' '-o' '--output' '-f' '--force' '-v' '--verbose'
                 return 0
             fi
             ;;
         remove-audio)
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
+                return 0
+            fi
             if [[ "$current_word" == -* ]]; then
                 _values 'options' '-o' '--output' '-r' '--reencode' '-f' '--force' '-v' '--verbose'
                 return 0
@@ -141,6 +153,10 @@ _kit_get_custom_completion() {
         compress-video)
             if [[ "$previous_word" == "-p" || "$previous_word" == "--preset" ]]; then
                 _values 'encoder preset' 'ultrafast' 'superfast' 'veryfast' 'faster' 'fast' 'medium' 'slow' 'slower' 'veryslow'
+                return 0
+            fi
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
                 return 0
             fi
             if [[ "$current_word" == -* ]]; then
