@@ -52,11 +52,11 @@ fixture_rc=$?
 assert_status "video fixture generation succeeds" "$fixture_rc" 0
 
 ffmpeg -v error -nostdin -f lavfi -i 'sine=frequency=440:duration=2' \
-    -c:a aac -b:a 64k "$TMP/voice.m4a"
+    -c:a aac -b:a 64k "$TMP/voice sample.m4a"
 fixture_rc=$?
 assert_status "audio fixture generation succeeds" "$fixture_rc" 0
 
-out=$(convert-to-mp3 "$TMP/voice.m4a" --preset speech --output "$TMP/speech.mp3" 2>&1)
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" --preset speech --output "$TMP/speech.mp3" 2>&1)
 rc=$?
 assert_status "convert-to-mp3 speech preset succeeds" "$rc" 0
 assert_file_exists "convert-to-mp3 honors custom output" "$TMP/speech.mp3"
@@ -67,17 +67,18 @@ assert_equals "speech preset produces MP3" "$codec" "mp3"
 assert_equals "speech preset uses 24 kHz" "$sample_rate" "24000"
 assert_equals "speech preset uses mono" "$channels" "1"
 
-out=$(convert-to-mp3 "$TMP/voice.m4a" --output "$TMP/standard.mp3" 2>&1)
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" 2>&1)
 rc=$?
 assert_status "convert-to-mp3 standard default succeeds" "$rc" 0
-standard_bitrate=$(ffprobe -v error -show_entries format=bit_rate -of default=nw=1:nk=1 "$TMP/standard.mp3" 2>/dev/null)
+assert_file_exists "convert-to-mp3 default output preserves spaces" "$TMP/voice sample.mp3"
+standard_bitrate=$(ffprobe -v error -show_entries format=bit_rate -of default=nw=1:nk=1 "$TMP/voice sample.mp3" 2>/dev/null)
 if [[ "$standard_bitrate" == <1-319999> ]]; then
     pass "standard default does not force 320 kbps"
 else
     fail "standard default does not force 320 kbps" "bitrate was: ${standard_bitrate:-missing}"
 fi
 
-out=$(convert-to-mp3 "$TMP/voice.m4a" --bitrate 64 --output "$TMP/custom.mp3" 2>&1)
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" --bitrate 64 --output "$TMP/custom.mp3" 2>&1)
 rc=$?
 assert_status "convert-to-mp3 custom bitrate succeeds" "$rc" 0
 custom_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of default=nw=1:nk=1 "$TMP/custom.mp3" 2>/dev/null)
@@ -99,14 +100,16 @@ rc=$?
 assert_status "failed forced conversion returns failure" "$rc" 1
 protected_contents=$(<"$TMP/protected.mp3")
 assert_equals "failed forced conversion preserves existing output" "$protected_contents" "existing output"
+temporary_count=$(find "$TMP" -name '*.kit-tmp.*' -type f | wc -l | tr -d ' ')
+assert_equals "failed conversion cleans temporary output" "$temporary_count" "0"
 
-out=$(convert-to-mp3 "$TMP/voice.m4a" --unknown 2>&1)
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" --unknown 2>&1)
 rc=$?
 assert_status "convert-to-mp3 rejects unknown options" "$rc" 2
-out=$(convert-to-mp3 "$TMP/voice.m4a" --bitrate 0 2>&1)
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" --bitrate 0 2>&1)
 rc=$?
 assert_status "convert-to-mp3 validates bitrate" "$rc" 2
-out=$(convert-to-mp3 "$TMP/voice.m4a" --preset speech --bitrate 64 2>&1)
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" --preset speech --bitrate 64 2>&1)
 rc=$?
 assert_status "convert-to-mp3 rejects conflicting quality controls" "$rc" 2
 

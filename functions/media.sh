@@ -143,7 +143,7 @@ _kit_media_report() {
 
     echo "$action: $output ($input_size → $output_size)"
     if [[ "$output_bytes" -gt "$input_bytes" ]]; then
-        echo "Warning: Output is larger than the input; try a smaller quality preset or bitrate." >&2
+        echo "Warning: Output is larger than the input; review the selected conversion settings." >&2
     fi
 }
 
@@ -219,6 +219,7 @@ EOF
     local opts=(--no-playlist --embed-metadata --embed-thumbnail)
 
     _kit_require yt-dlp || return 1
+    _kit_require ffmpeg || return 1
 
     if [[ "$force" == true ]]; then
         opts+=(--force-overwrites)
