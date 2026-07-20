@@ -113,12 +113,12 @@ _kit_get_custom_completion() {
                 _values 'format' 'mp3' 'mp4'
                 return 0
             fi
-            if [[ $pos -eq 5 && "${words[3]:-}" == "mp3" ]]; then
-                _values 'MP3 quality' '0' '2' '5' '7' '10' '64K' '96K' '128K' '192K' '320K'
-                return 0
-            fi
             if [[ "$current_word" == -* ]]; then
                 _values 'options' '-o' '--output' '-f' '--force' '-v' '--verbose'
+                return 0
+            fi
+            if [[ $pos -eq 5 && "${words[3]:-}" == "mp3" ]]; then
+                _values 'MP3 quality' '0' '2' '5' '7' '10' '64K' '96K' '128K' '192K' '320K'
                 return 0
             fi
             ;;

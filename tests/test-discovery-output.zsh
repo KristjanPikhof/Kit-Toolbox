@@ -103,6 +103,10 @@ out=$(run_zsh '
     CURRENT=4
     words=(kit compress-video --preset "")
     _kit_get_custom_completion compress-video "$CURRENT"
+    print -r -- YT_MP3_OPTIONS
+    CURRENT=5
+    words=(kit yt-download mp3 https://example.com --)
+    _kit_get_custom_completion yt-download "$CURRENT"
   }
   source_completion
 ')
@@ -122,6 +126,7 @@ assert_contains "completion includes MP3 speech preset" "$out" "speech"
 assert_contains "completion includes MP3 standard preset" "$out" "standard"
 assert_contains "completion includes remove-audio reencode option" "$out" "--reencode"
 assert_contains "completion includes video encoder presets" "$out" "veryslow"
+assert_contains "yt-download option prefix takes priority over quality values" "$out" $'YT_MP3_OPTIONS\nVALUES:options'
 assert_not_contains "completion helper output has no unexpected missing-file noise" "$out" "no such file"
 assert_not_contains "completion helper output has no command-not-found noise" "$out" "command not found"
 
