@@ -94,6 +94,15 @@ out=$(run_zsh '
     _kit_get_shortcuts
     print -r -- EDITORS
     _kit_get_editors
+    CURRENT=4
+    words=(kit convert-to-mp3 --preset "")
+    _kit_get_custom_completion convert-to-mp3 "$CURRENT"
+    CURRENT=3
+    words=(kit remove-audio -)
+    _kit_get_custom_completion remove-audio "$CURRENT"
+    CURRENT=4
+    words=(kit compress-video --preset "")
+    _kit_get_custom_completion compress-video "$CURRENT"
   }
   source_completion
 ')
@@ -109,6 +118,10 @@ assert_contains "completion command list includes function entry" "$out" "img-re
 assert_contains "completion command list includes function category" "$out" "Image Processing"
 assert_contains "completion command list includes shortcut entry" "$out" "proj:Fixture project shortcut"
 assert_contains "completion command list includes editor entry" "$out" "edit:Fixture fake editor"
+assert_contains "completion includes MP3 speech preset" "$out" "speech"
+assert_contains "completion includes MP3 standard preset" "$out" "standard"
+assert_contains "completion includes remove-audio reencode option" "$out" "--reencode"
+assert_contains "completion includes video encoder presets" "$out" "veryslow"
 assert_not_contains "completion helper output has no unexpected missing-file noise" "$out" "no such file"
 assert_not_contains "completion helper output has no command-not-found noise" "$out" "command not found"
 
