@@ -42,11 +42,7 @@ _kit_media_temporary_output() {
 
     directory=$(dirname "$output")
     filename=$(basename "$output")
-    if [[ "${filename#.}" == *.* ]]; then
-        temporary_name="${filename%.*}.kit-tmp.$$.$RANDOM.${filename##*.}"
-    else
-        temporary_name="${filename}.kit-tmp.$$.$RANDOM"
-    fi
+    temporary_name=".kit-tmp.$$.$RANDOM.${filename}"
 
     if [[ "$directory" == "." ]]; then
         printf '%s\n' "$temporary_name"
@@ -118,10 +114,23 @@ _kit_media_run_ffmpeg() {
         return 1
     fi
 
-    if ! mv -f "$temporary_output" "$output"; then
-        rm -f "$temporary_output"
-        echo "Error: Failed to move completed output to '$output'" >&2
-        return 1
+    if [[ "$force" == true ]]; then
+        if ! mv -f "$temporary_output" "$output"; then
+            rm -f "$temporary_output"
+            echo "Error: Failed to move completed output to '$output'" >&2
+            return 1
+        fi
+    else
+        if ! mv -n "$temporary_output" "$output"; then
+            rm -f "$temporary_output"
+            echo "Error: Failed to move completed output to '$output'" >&2
+            return 1
+        fi
+        if [[ -e "$temporary_output" || -L "$temporary_output" ]]; then
+            rm -f "$temporary_output"
+            echo "Error: Output file '$output' was created while FFmpeg was running; refusing to overwrite." >&2
+            return 1
+        fi
     fi
 
     return 0
@@ -357,11 +366,9 @@ EOF
         fi
     fi
 
-    local -a ffmpeg_args=(-map 0:v:0 -map_metadata 0 -an)
+    local -a ffmpeg_args=(-map 0 -map -0:a -map_metadata 0 -map_chapters 0 -c copy)
     if [[ "$reencode" == true ]]; then
         ffmpeg_args+=(-c:v libx264 -crf 23 -preset fast)
-    else
-        ffmpeg_args+=(-c:v copy)
     fi
     case "${output##*.}" in
         mp4|MP4|m4v|M4V|mov|MOV)
@@ -664,10 +671,12 @@ EOF
         return 2
     fi
 
-    # Validate width (must be -1 or a non-zero positive integer)
-    if [[ "$width" != "-1" ]] && ! [[ "$width" =~ ^[1-9][0-9]*$ ]]; then
-        echo "Error: Invalid width '$width'. Must be -1 or a positive integer." >&2
-        return 2
+    # Validate width (must be -1 or large enough to produce an even H.264 frame)
+    if [[ "$width" != "-1" ]]; then
+        if ! [[ "$width" =~ ^[0-9]+$ ]] || [[ "$width" -lt 2 ]]; then
+            echo "Error: Invalid width '$width'. Must be -1 or an integer of at least 2." >&2
+            return 2
+        fi
     fi
 
     local bitrate_value="${bitrate%k}"
@@ -679,7 +688,7 @@ EOF
     local -a ffmpeg_args=(-map 0:v:0 -map "0:a:0?" -map_metadata 0 -c:v libx264 -crf "$crf" -preset "$preset" -c:a aac -b:a "$bitrate")
 
     if [[ "$width" != "-1" ]]; then
-        ffmpeg_args+=(-vf "scale='min(iw,${width})':-2")
+        ffmpeg_args+=(-vf "scale='trunc(min(iw,${width})/2)*2':-2")
     fi
 
     case "${output##*.}" in
