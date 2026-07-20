@@ -392,6 +392,7 @@ run_test "yt-download: help works" "kit yt-download -h"
 run_test "remove-audio: help works" "kit remove-audio -h"
 run_test "convert-to-mp3: help works" "kit convert-to-mp3 -h"
 run_test "compress-video: help works" "kit compress-video -h"
+run_test "media conversion contracts" "zsh $SCRIPT_DIR/test-media.zsh"
 
 # Functional tests
 if [[ -f "$ASSETS_DIR/video/test_input_video.mp4" ]]; then
