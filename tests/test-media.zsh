@@ -56,6 +56,21 @@ ffmpeg -v error -nostdin -f lavfi -i 'sine=frequency=440:duration=2' \
 fixture_rc=$?
 assert_status "audio fixture generation succeeds" "$fixture_rc" 0
 
+cat > "$TMP/caption.srt" <<'EOF'
+1
+00:00:00,000 --> 00:00:01,000
+Test caption
+EOF
+ffmpeg -v error -nostdin \
+    -f lavfi -i 'testsrc2=duration=2:size=640x360:rate=24' \
+    -f lavfi -i 'sine=frequency=1000:duration=2' \
+    -f srt -i "$TMP/caption.srt" \
+    -map 0:v:0 -map 1:a:0 -map 2:s:0 \
+    -c:v libx264 -preset ultrafast -crf 30 -pix_fmt yuv420p \
+    -c:a aac -b:a 64k -c:s srt "$TMP/captioned.mkv"
+fixture_rc=$?
+assert_status "captioned fixture generation succeeds" "$fixture_rc" 0
+
 out=$(convert-to-mp3 "$TMP/voice sample.m4a" --preset speech --output "$TMP/speech.mp3" 2>&1)
 rc=$?
 assert_status "convert-to-mp3 speech preset succeeds" "$rc" 0
@@ -82,6 +97,11 @@ out=$(convert-to-mp3 "$TMP/voice sample.m4a" --output "$TMP/.hidden.mp3" 2>&1)
 rc=$?
 assert_status "convert-to-mp3 supports hidden output filenames" "$rc" 0
 assert_file_exists "hidden MP3 output is created" "$TMP/.hidden.mp3"
+
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" --output "$TMP/.mp3" 2>&1)
+rc=$?
+assert_status "convert-to-mp3 supports a bare hidden MP3 output" "$rc" 0
+assert_file_exists "bare hidden MP3 output is created" "$TMP/.mp3"
 
 cp "$TMP/voice sample.m4a" "$TMP/.hidden-source.m4a"
 out=$(convert-to-mp3 "$TMP/.hidden-source.m4a" 2>&1)
@@ -140,6 +160,14 @@ assert_status "remove-audio explicit re-encode succeeds" "$rc" 0
 reencoded_codec=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=nw=1:nk=1 "$TMP/muted-reencoded.mp4" 2>/dev/null)
 assert_equals "remove-audio re-encode uses H.264" "$reencoded_codec" "h264"
 
+out=$(remove-audio "$TMP/captioned.mkv" --output "$TMP/captioned-muted.mkv" 2>&1)
+rc=$?
+assert_status "remove-audio succeeds with subtitle streams" "$rc" 0
+subtitle_streams=$(ffprobe -v error -select_streams s -show_entries stream=index -of csv=p=0 "$TMP/captioned-muted.mkv" 2>/dev/null | wc -l | tr -d ' ')
+assert_equals "remove-audio preserves subtitle streams" "$subtitle_streams" "1"
+audio_streams=$(ffprobe -v error -select_streams a -show_entries stream=index -of csv=p=0 "$TMP/captioned-muted.mkv" 2>/dev/null | wc -l | tr -d ' ')
+assert_equals "captioned remove-audio output has no audio" "$audio_streams" "0"
+
 out=$(compress-video "$TMP/video.mp4" --preset ultrafast --output "$TMP/compressed.mp4" 2>&1)
 rc=$?
 assert_status "compress-video default succeeds" "$rc" 0
@@ -152,12 +180,41 @@ assert_status "compress-video maximum width succeeds" "$rc" 0
 compressed_width=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of default=nw=1:nk=1 "$TMP/compressed-320.mp4" 2>/dev/null)
 assert_equals "compress-video shrinks above maximum width" "$compressed_width" "320"
 
+out=$(compress-video "$TMP/video.mp4" --preset ultrafast --width 319 --output "$TMP/compressed-odd-width.mp4" 2>&1)
+rc=$?
+assert_status "compress-video accepts an odd maximum width" "$rc" 0
+compressed_width=$(ffprobe -v error -select_streams v:0 -show_entries stream=width -of default=nw=1:nk=1 "$TMP/compressed-odd-width.mp4" 2>/dev/null)
+assert_equals "compress-video rounds an odd maximum width down" "$compressed_width" "318"
+
 out=$(compress-video "$TMP/video.mp4" --width 0 --output "$TMP/invalid-width.mp4" 2>&1)
 rc=$?
 assert_status "compress-video rejects zero width" "$rc" 2
+out=$(compress-video "$TMP/video.mp4" --width 1 --output "$TMP/too-small-width.mp4" 2>&1)
+rc=$?
+assert_status "compress-video rejects widths below two pixels" "$rc" 2
 out=$(compress-video "$TMP/video.mp4" --bitrate nope --output "$TMP/invalid-bitrate.mp4" 2>&1)
 rc=$?
 assert_status "compress-video validates audio bitrate" "$rc" 2
+
+print -r -- "input" > "$TMP/race-input.dat"
+race_output="$TMP/race-output.dat"
+(
+    ffmpeg() {
+        local destination="${@[-1]}"
+        (sleep 0.05; print -r -- "protected" > "$race_output") &
+        local creator_pid=$!
+        sleep 0.1
+        print -r -- "converted" > "$destination"
+        wait "$creator_pid"
+    }
+    _kit_media_run_ffmpeg "$TMP/race-input.dat" "$race_output" false false
+) > "$TMP/race.log" 2>&1
+rc=$?
+assert_status "non-force finalization rejects an output created during conversion" "$rc" 1
+race_contents=$(<"$race_output")
+assert_equals "non-force finalization preserves the concurrent output" "$race_contents" "protected"
+temporary_count=$(find "$TMP" -name '*.kit-tmp.*' -type f | wc -l | tr -d ' ')
+assert_equals "non-force race cleanup removes temporary output" "$temporary_count" "0"
 
 out=$(yt-download mp3 "https://example.com/audio" 2>&1)
 rc=$?
