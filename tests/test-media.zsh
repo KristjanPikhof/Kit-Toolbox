@@ -78,6 +78,17 @@ else
     fail "standard default does not force 320 kbps" "bitrate was: ${standard_bitrate:-missing}"
 fi
 
+out=$(convert-to-mp3 "$TMP/voice sample.m4a" --output "$TMP/.hidden.mp3" 2>&1)
+rc=$?
+assert_status "convert-to-mp3 supports hidden output filenames" "$rc" 0
+assert_file_exists "hidden MP3 output is created" "$TMP/.hidden.mp3"
+
+cp "$TMP/voice sample.m4a" "$TMP/.hidden-source.m4a"
+out=$(convert-to-mp3 "$TMP/.hidden-source.m4a" 2>&1)
+rc=$?
+assert_status "convert-to-mp3 supports hidden input filenames" "$rc" 0
+assert_file_exists "hidden input uses the correct default stem" "$TMP/.hidden-source.mp3"
+
 out=$(convert-to-mp3 "$TMP/voice sample.m4a" --bitrate 64 --output "$TMP/custom.mp3" 2>&1)
 rc=$?
 assert_status "convert-to-mp3 custom bitrate succeeds" "$rc" 0

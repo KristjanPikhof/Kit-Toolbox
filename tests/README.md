@@ -20,7 +20,7 @@ The test suite verifies integration and characterization tests across all toolki
 | Category | Tests | Coverage |
 |----------|-------|----------|
 | Image Processing | 17 | Help + functional tests for resize, optimize, convert, thumbnail, rename |
-| Media Processing | 10 suite entries + 37 focused assertions | Help, codec/bitrate, stream copy, no-upscale sizing, overwrite safety, validation, and downloader arguments |
+| Media Processing | 10 suite entries + 39 focused assertions | Help, codec/bitrate, stream copy, no-upscale sizing, overwrite safety, validation, and downloader arguments |
 | System Utilities | 5 | Help + functional tests for mklink, killports, update, uninstall |
 | Core & Navigation | 3 | Dispatcher, help, search, categories |
 | Loader Characterization | 3 | Hermetic kit-core, shortcut/editor dispatch, discovery/completion output |
