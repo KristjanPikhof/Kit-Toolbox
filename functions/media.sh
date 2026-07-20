@@ -5,12 +5,12 @@
 # Functions: yt-download, remove-audio, convert-to-mp3, compress-video
 
 _kit_media_normalize_path() {
-    local path="$1"
+    local file_path="$1"
     local directory
     local filename
 
-    directory=$(dirname "$path")
-    filename=$(basename "$path")
+    directory=$(dirname "$file_path")
+    filename=$(basename "$file_path")
     directory=$(cd "$directory" 2>/dev/null && pwd -P) || return 1
 
     printf '%s/%s\n' "$directory" "$filename"
