@@ -23,7 +23,7 @@ _kit_media_stem() {
 
     directory=$(dirname "$file_path")
     filename=$(basename "$file_path")
-    if [[ "$filename" == *.* && "$filename" != .* ]]; then
+    if [[ "${filename#.}" == *.* ]]; then
         filename="${filename%.*}"
     fi
 
@@ -42,7 +42,7 @@ _kit_media_temporary_output() {
 
     directory=$(dirname "$output")
     filename=$(basename "$output")
-    if [[ "$filename" == *.* && "$filename" != .* ]]; then
+    if [[ "${filename#.}" == *.* ]]; then
         temporary_name="${filename%.*}.kit-tmp.$$.$RANDOM.${filename##*.}"
     else
         temporary_name="${filename}.kit-tmp.$$.$RANDOM"
