@@ -548,7 +548,7 @@ Options:
   -p, --preset PRESET  Encoding speed (default: slow)
                        Options: ultrafast, superfast, veryfast, faster,
                                 fast, medium, slow, slower, veryslow
-  -w, --width NUM      Maximum width (default: 1280, never upscales; -1 disables)
+  -w, --width NUM      Maximum width (default: 1280, minimum: 2; -1 disables)
   -b, --bitrate NUM    Audio bitrate in k (default: 128)
   -f, --force          Safely replace the output after conversion succeeds
   -v, --verbose        Show ffmpeg output

@@ -288,7 +288,8 @@ kit-toolkit/
 │   ├── run-tests.sh          # Main integration test runner
 │   ├── test-kit-core.zsh     # Hermetic kit-core helper tests
 │   ├── test-loader-config.zsh # Hermetic shortcut/editor dispatch tests
-│   └── test-discovery-output.zsh # Hermetic help/completion output tests
+│   ├── test-discovery-output.zsh # Hermetic help/completion output tests
+│   └── test-media.zsh        # Hermetic media conversion contract tests
 │
 └── llm_prompts/              # AI development guides
     └── kit_pattern.md        # Complete pattern specification
@@ -421,7 +422,7 @@ kit compress-video video.mp4 -p veryslow -c 22
 - `-c, --crf NUM` — Quality level 18-28 (default: 23, lower = better)
 - `-p, --preset PRESET` — Encoding speed (default: slow)
   - Options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
-- `-w, --width NUM` — Maximum width in pixels (default: 1280, never upscales; `-1` disables scaling)
+- `-w, --width NUM` — Maximum width in pixels (default: 1280, minimum: 2; odd limits round down; `-1` disables scaling)
 - `-b, --bitrate NUM` — Audio bitrate in k (default: 128)
 - `-f, --force` — Replace an existing output only after encoding succeeds
 - `-v, --verbose` — Show ffmpeg output
