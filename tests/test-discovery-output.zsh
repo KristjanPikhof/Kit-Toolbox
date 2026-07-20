@@ -107,6 +107,14 @@ out=$(run_zsh '
     CURRENT=5
     words=(kit yt-download mp3 https://example.com --)
     _kit_get_custom_completion yt-download "$CURRENT"
+    print -r -- YT_OUTPUT_VALUE
+    CURRENT=5
+    words=(kit yt-download mp3 --output "")
+    _kit_get_custom_completion yt-download "$CURRENT"
+    print -r -- YT_LEADING_OPTION
+    CURRENT=3
+    words=(kit yt-download -)
+    _kit_get_custom_completion yt-download "$CURRENT"
   }
   source_completion
 ')
@@ -127,6 +135,8 @@ assert_contains "completion includes MP3 standard preset" "$out" "standard"
 assert_contains "completion includes remove-audio reencode option" "$out" "--reencode"
 assert_contains "completion includes video encoder presets" "$out" "veryslow"
 assert_contains "yt-download option prefix takes priority over quality values" "$out" $'YT_MP3_OPTIONS\nVALUES:options'
+assert_contains "yt-download output value uses file completion" "$out" $'YT_OUTPUT_VALUE\nFILES'
+assert_contains "yt-download leading option prefix uses option completion" "$out" $'YT_LEADING_OPTION\nVALUES:options'
 assert_not_contains "completion helper output has no unexpected missing-file noise" "$out" "no such file"
 assert_not_contains "completion helper output has no command-not-found noise" "$out" "command not found"
 
