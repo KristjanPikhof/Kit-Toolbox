@@ -114,23 +114,23 @@ _kit_media_run_ffmpeg() {
         return 1
     fi
 
+    local move_option
     if [[ "$force" == true ]]; then
-        if ! mv -f "$temporary_output" "$output"; then
-            rm -f "$temporary_output"
-            echo "Error: Failed to move completed output to '$output'" >&2
-            return 1
-        fi
+        move_option="-f"
     else
-        if ! mv -n "$temporary_output" "$output"; then
-            rm -f "$temporary_output"
-            echo "Error: Failed to move completed output to '$output'" >&2
-            return 1
-        fi
-        if [[ -e "$temporary_output" || -L "$temporary_output" ]]; then
-            rm -f "$temporary_output"
-            echo "Error: Output file '$output' was created while FFmpeg was running; refusing to overwrite." >&2
-            return 1
-        fi
+        move_option="-n"
+    fi
+
+    if ! mv "$move_option" "$temporary_output" "$output"; then
+        rm -f "$temporary_output"
+        echo "Error: Failed to move completed output to '$output'" >&2
+        return 1
+    fi
+
+    if [[ "$force" != true && ( -e "$temporary_output" || -L "$temporary_output" ) ]]; then
+        rm -f "$temporary_output"
+        echo "Error: Output file '$output' was created while FFmpeg was running; refusing to overwrite." >&2
+        return 1
     fi
 
     return 0
