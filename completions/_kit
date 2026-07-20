@@ -104,11 +104,47 @@ _kit_is_shortcut() {
 _kit_get_custom_completion() {
     local cmd="$1"
     local pos="$2"  # Current argument position (zsh $CURRENT is 1-based: 2=first cmd arg, 3=second, etc.)
+    local previous_word="${words[$((pos - 1))]:-}"
+    local current_word="${words[$pos]:-}"
 
     case "$cmd" in
         yt-download)
             if [[ $pos -eq 3 ]]; then
                 _values 'format' 'mp3' 'mp4'
+                return 0
+            fi
+            if [[ $pos -eq 5 && "${words[3]:-}" == "mp3" ]]; then
+                _values 'MP3 quality' '0' '2' '5' '7' '10' '64K' '96K' '128K' '192K' '320K'
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-o' '--output' '-f' '--force' '-v' '--verbose'
+                return 0
+            fi
+            ;;
+        convert-to-mp3)
+            if [[ "$previous_word" == "-p" || "$previous_word" == "--preset" ]]; then
+                _values 'MP3 preset' 'speech' 'compact' 'standard' 'high' 'maximum'
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-p' '--preset' '-b' '--bitrate' '-o' '--output' '-f' '--force' '-v' '--verbose'
+                return 0
+            fi
+            ;;
+        remove-audio)
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-o' '--output' '-r' '--reencode' '-f' '--force' '-v' '--verbose'
+                return 0
+            fi
+            ;;
+        compress-video)
+            if [[ "$previous_word" == "-p" || "$previous_word" == "--preset" ]]; then
+                _values 'encoder preset' 'ultrafast' 'superfast' 'veryfast' 'faster' 'fast' 'medium' 'slow' 'slower' 'veryslow'
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-o' '--output' '-c' '--crf' '-p' '--preset' '-w' '--width' '-b' '--bitrate' '-f' '--force' '-v' '--verbose'
                 return 0
             fi
             ;;

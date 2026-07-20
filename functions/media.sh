@@ -16,6 +16,45 @@ _kit_media_normalize_path() {
     printf '%s/%s\n' "$directory" "$filename"
 }
 
+_kit_media_stem() {
+    local file_path="$1"
+    local directory
+    local filename
+
+    directory=$(dirname "$file_path")
+    filename=$(basename "$file_path")
+    if [[ "$filename" == *.* && "$filename" != .* ]]; then
+        filename="${filename%.*}"
+    fi
+
+    if [[ "$directory" == "." ]]; then
+        printf '%s\n' "$filename"
+    else
+        printf '%s/%s\n' "$directory" "$filename"
+    fi
+}
+
+_kit_media_temporary_output() {
+    local output="$1"
+    local directory
+    local filename
+    local temporary_name
+
+    directory=$(dirname "$output")
+    filename=$(basename "$output")
+    if [[ "$filename" == *.* && "$filename" != .* ]]; then
+        temporary_name="${filename%.*}.kit-tmp.$$.$RANDOM.${filename##*.}"
+    else
+        temporary_name="${filename}.kit-tmp.$$.$RANDOM"
+    fi
+
+    if [[ "$directory" == "." ]]; then
+        printf '%s\n' "$temporary_name"
+    else
+        printf '%s/%s\n' "$directory" "$temporary_name"
+    fi
+}
+
 _kit_media_validate_output() {
     local input="$1"
     local output="$2"
@@ -37,7 +76,7 @@ _kit_media_validate_output() {
         return 2
     fi
 
-    if [[ -e "$output" && "$force" != true ]]; then
+    if [[ ( -e "$output" || -L "$output" ) && "$force" != true ]]; then
         echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
         return 1
     fi
@@ -54,13 +93,12 @@ _kit_media_run_ffmpeg() {
 
     _kit_media_validate_output "$input" "$output" "$force" || return $?
 
-    local output_base="${output%.*}"
-    local output_extension="${output##*.}"
-    local temporary_output="${output_base}.kit-tmp.$$.$RANDOM.${output_extension}"
+    local temporary_output
     local -a ffmpeg_cmd=(ffmpeg -hide_banner -nostdin)
 
+    temporary_output=$(_kit_media_temporary_output "$output")
     while [[ -e "$temporary_output" ]]; do
-        temporary_output="${output_base}.kit-tmp.$$.$RANDOM.${output_extension}"
+        temporary_output=$(_kit_media_temporary_output "$output")
     done
 
     if [[ "$verbose" != true ]]; then
@@ -202,7 +240,12 @@ EOF
                     echo "Error: MP3 quality must be between 0 and 10" >&2
                     return 2
                 fi
-            elif ! [[ "$quality" =~ ^[0-9]+[kK]$ ]]; then
+            elif [[ "$quality" =~ ^[0-9]+[kK]$ ]]; then
+                if [[ "${quality%[kK]}" -lt 1 ]]; then
+                    echo "Error: MP3 bitrate must be greater than zero" >&2
+                    return 2
+                fi
+            else
                 echo "Error: MP3 quality must be 0-10 or a bitrate such as 128K" >&2
                 return 2
             fi
@@ -299,15 +342,17 @@ EOF
     _kit_require ffmpeg || return 1
 
     if [[ -z "$output" ]]; then
+        local input_stem
+        input_stem=$(_kit_media_stem "$input")
         if [[ "$reencode" == true ]]; then
-            output="${input%.*}_noaudio.mp4"
+            output="${input_stem}_noaudio.mp4"
         else
             local input_name="${input##*/}"
             local input_extension="mkv"
             if [[ "$input_name" == *.* ]]; then
                 input_extension="${input##*.}"
             fi
-            output="${input%.*}_noaudio.${input_extension}"
+            output="${input_stem}_noaudio.${input_extension}"
         fi
     fi
 
@@ -446,7 +491,7 @@ EOF
     fi
 
     if [[ -z "$output" ]]; then
-        output="${input%.*}.mp3"
+        output="$(_kit_media_stem "$input").mp3"
     fi
     local output_extension
     output_extension=$(printf '%s' "${output##*.}" | tr '[:upper:]' '[:lower:]')
@@ -595,7 +640,7 @@ EOF
     _kit_require ffmpeg || return 1
 
     if [[ -z "$output" ]]; then
-        output="${input%.*}_compressed.mp4"
+        output="$(_kit_media_stem "$input")_compressed.mp4"
     fi
 
     # Validate CRF value (must be numeric, 0-51)
