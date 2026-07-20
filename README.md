@@ -484,7 +484,7 @@ cd tests
 ```
 
 **Test Coverage:**
-- **47 tests** across all categories
+- Hermetic and integration coverage across all categories
 - Image processing (resize, optimize, convert, thumbnail, rename)
 - Media processing (compress, remove-audio, convert-to-mp3, yt-download)
 - PDF processing (split, merge, compress, rotate)
