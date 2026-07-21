@@ -544,7 +544,7 @@ Usage: kit compress-video <input_video> [options]
 Description: Compress video files to reduce size for uploads
 Options:
   -o, --output FILE    Output file (default: input_compressed.mp4)
-  -c, --crf NUM        Quality level 18-28 (default: 23, lower=better)
+  -c, --crf NUM        H.264 quality 0-51 (default: 23; 18-28 typical, lower=better)
   -p, --preset PRESET  Encoding speed (default: slow)
                        Options: ultrafast, superfast, veryfast, faster,
                                 fast, medium, slow, slower, veryslow

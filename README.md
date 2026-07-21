@@ -69,39 +69,38 @@ sudo dnf install zsh  # Fedora
 sudo pacman -S zsh    # Arch
 
 # Then change your default shell
-chsh -s $(which zsh)
+chsh -s "$(command -v zsh)"
 # Log out and back in for changes to take effect
 ```
 
-### Installation
-
-#### Automated Installation (Recommended)
+### Automated installation (recommended)
 
 ```bash
-# Clone kit-toolkit to ANY directory you prefer
-git clone https://github.com/KristjanPikhof/Kit-Toolbox.git
+# Clone the repository to any directory you prefer
+git clone https://github.com/KristjanPikhof/Kit-Toolbox.git kit-toolbox
+cd kit-toolbox
 
 # Run the install script (it will auto-detect its location)
 zsh install.sh
 ```
 
-**Note:** The installer automatically detects where you've downloaded kit-toolkit, so it works from any location.
+**Note:** The installer detects the repository directory, so the clone can live anywhere.
 
 The installer will:
 - ✓ Backup your existing `.zshrc`
 - ✓ Add Kit configuration to your shell
 - ✓ Detect your OS and package manager (macOS/Linux with brew, apt, dnf, pacman, etc.)
-- ✓ Check for optional dependencies (ImageMagick, yt-dlp, ffmpeg, lsd)
+- ✓ Check for optional dependencies (ImageMagick, yt-dlp, ffmpeg, qpdf, lsd, lsof)
 - ✓ Offer to install missing dependencies automatically
 - ✓ Verify the installation
 
-#### Manual Installation
+### Manual installation
 
 If you prefer to install manually:
 
 ```bash
 # Add to your ~/.zshrc (replace /path/to with your actual location)
-export KIT_EXT_DIR="/path/to/kit-toolkit"
+export KIT_EXT_DIR="/path/to/kit-toolbox"
 source "$KIT_EXT_DIR/loader.zsh"
 
 # Then reload your shell
@@ -179,9 +178,8 @@ Auto-generated shortcuts from `shortcuts.conf` for quick directory navigation:
 
 **Auto-generated navigation shortcuts** (configured in `shortcuts.conf`):
 ```bash
-kit dev        # Navigate to ~/Desktop/Development
-kit claudedir  # Navigate to ~/.claude/
-kit kit        # Navigate to kit-toolkit directory
+kit claudedir   # Navigate to ~/.claude/
+kit opencodedir # Navigate to ~/.config/opencode/
 # ... and more, see `kit -h` for full list
 ```
 
@@ -189,7 +187,7 @@ Kit also creates direct shell functions for these shortcuts after the loader is 
 
 Shortcut wrappers use a source-time registry. Valid shortcut changes are picked up after you reload Kit (`source ~/.zshrc` or `source "$KIT_EXT_DIR/loader.zsh"`). Removed shortcuts are unregistered on re-source. Config edits without re-sourcing keep the previous registry until you reload.
 
-**Deprecated:** `kit goto <name>` is deprecated. Use shortcuts directly: `kit <name>`
+- **goto** — Deprecated shortcut lookup. Prefer `kit <name>` over `kit goto <name>`.
 
 ### ✏️ Editor Shortcuts
 Auto-generated shortcuts from `editor.conf` for opening files/folders in your preferred editor:
@@ -250,8 +248,8 @@ Enhanced file listing with `lsd`:
 
 ## Directory Structure
 
-```
-kit-toolkit/
+```text
+kit-toolbox/
 ├── loader.zsh                # Main loader with kit dispatcher
 ├── install.sh                # Automated installation script
 ├── categories.conf           # Category registry
@@ -306,7 +304,7 @@ kit --search <keyword>   # Search functions by name
 kit --list-categories    # List all categories with counts
 ```
 
-### Examples
+### General examples
 
 ```bash
 # Show all functions
@@ -333,8 +331,8 @@ Created: photo-resized.jpg
 # Rename image files (sanitize spaces and special characters)
 $ kit img-rename "my photo 1.jpg"
 Renamed: my photo 1.jpg -> my_photo_1.jpg
-$ kit img-rename "VR (Quest/similar).jpg"
-Renamed: VR (Quest/similar).jpg -> VR_Quest_similar.jpg
+$ kit img-rename "VR (Quest~similar).jpg"
+Renamed: VR (Quest~similar).jpg -> VR_Quest_similar.jpg
 $ kit img-rename . --sep "-"
 Renamed: image 1.png -> image-1.png
 
@@ -354,7 +352,7 @@ $ kit compress-video video.mp4 -c 28 -o small.mp4
 $ kit compress-video video.mp4 --width 1920 --preset medium
 ```
 
-#### Audio Conversion and Download Examples
+### Audio conversion and download examples
 
 `convert-to-mp3` uses the `standard` VBR profile by default instead of forcing 320kbps. Use `speech` for voice recordings or set an exact bitrate when output size needs to be predictable.
 
@@ -392,7 +390,7 @@ kit remove-audio source.mkv --output silent.mkv
 kit remove-audio source.mov --reencode --output silent.mp4
 ```
 
-#### Video Compression Examples
+### Video compression examples
 
 The `compress-video` function supports multiple options for controlling output quality and file size:
 
@@ -419,11 +417,11 @@ kit compress-video video.mp4 -p veryslow -c 22
 
 **Options:**
 - `-o, --output FILE` — Output filename (default: input_compressed.mp4)
-- `-c, --crf NUM` — Quality level 18-28 (default: 23, lower = better)
+- `-c, --crf NUM` — H.264 quality level 0-51 (default: 23; 18-28 is the typical useful range, lower = better)
 - `-p, --preset PRESET` — Encoding speed (default: slow)
   - Options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
 - `-w, --width NUM` — Maximum width in pixels (default: 1280, minimum: 2; odd limits round down; `-1` disables scaling)
-- `-b, --bitrate NUM` — Audio bitrate in k (default: 128)
+- `-b, --bitrate NUM` — Audio bitrate in k, 8-512 (default: 128)
 - `-f, --force` — Replace an existing output only after encoding succeeds
 - `-v, --verbose` — Show ffmpeg output
 
@@ -438,7 +436,7 @@ kit compress-video video.mp4 -p veryslow -c 22
 
 **Note:** Lower CRF = better quality but larger file. CRF does not guarantee a smaller result, so Kit reports the before/after sizes and warns when the output is larger.
 
-#### PDF Processing Examples
+### PDF processing examples
 
 ```bash
 # Split PDF into multiple files
@@ -470,19 +468,29 @@ kit pdf-rotate book.pdf 270 "5-10" -o fixed.pdf
 
 ### Testing
 
-Kit includes a comprehensive test suite that verifies all functionality:
+Kit includes focused contract suites and a cross-category integration runner:
 
-```bash
-# Run all tests
-cd tests
-./run-tests.sh
+```zsh
+# Run the interactive integration suite from the repository root
+zsh tests/run-tests.sh
 
 # Run with verbose output
-./run-tests.sh -v
+zsh tests/run-tests.sh -v
 
 # Show help
-./run-tests.sh -h
+zsh tests/run-tests.sh -h
+
+# Run the hermetic focused suites (no live YouTube download)
+for test in tests/test-{kit-core,loader-config,discovery-output,media}.zsh; do
+  zsh "$test" || break
+done
 ```
+
+Run the integration suite with Zsh. Invoking `./tests/run-tests.sh` follows its
+Bash shebang, but the runner sources Zsh-only toolkit code and fails during
+startup. The integration suite also recreates `tests/assets`, checks external
+dependencies, performs a live YouTube download when available, and prompts for
+cleanup.
 
 **Test Coverage:**
 - Hermetic and integration coverage across all categories
@@ -506,14 +514,14 @@ See [tests/README.md](tests/README.md) for complete test documentation.
 
 1. **Generate template:**
    ```bash
-   ./scripts/new-function.sh category function-name "Brief description"
+   bash scripts/new-function.sh category function-name "Brief description"
    ```
 
 2. **Implement the function** in `functions/category.sh`
 
 3. **Validate:**
-   ```bash
-   ./scripts/validate-pattern.sh functions/category.sh
+   ```zsh
+   zsh scripts/validate-pattern.sh functions/category.sh
    ```
 
 4. **Test:**
@@ -527,28 +535,25 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for complete guide.
 
 ### Creating a New Category
 
-1. Create `functions/newcategory.sh` with proper headers
+1. Create `functions/newcategory.sh` with `Category`, `Description`, `Dependencies`, and `Functions` headers
 2. Add entry to `categories.conf`
 3. Generate functions using the template generator
 
 Example:
 ```bash
-# Create new category for git tools
-touch functions/git.sh
-
-# Add to categories.conf
-# git:Git Tools:Git-related utilities
+# After creating functions/git.sh with the required headers and registering:
+# git:Git Tools:Git-related utilities in categories.conf
 
 # Generate first function
-./scripts/new-function.sh git git-clean-branches "Remove merged branches"
+bash scripts/new-function.sh git git-clean-branches "Remove merged branches"
 ```
 
 ### Validating Functions
 
 Check if functions follow the pattern:
-```bash
-./scripts/validate-pattern.sh functions/myfile.sh
-./scripts/validate-pattern.sh functions/*.sh  # Check all
+```zsh
+zsh scripts/validate-pattern.sh functions/myfile.sh
+zsh scripts/validate-pattern.sh functions/*.sh  # Check all
 ```
 
 ### Configuring Navigation Shortcuts
@@ -625,7 +630,7 @@ Every function must follow the pattern from `llm_prompts/kit_pattern.md`:
 Example:
 ```bash
 my-function() {
-    if [[ "$1" == "-h" || -z "$1" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
 Usage: kit my-function <input>
 Description: Does something useful
@@ -634,6 +639,7 @@ EOF
         return 0
     fi
 
+    [[ -n "$1" ]] || { echo "Error: Missing input" >&2; return 2; }
     [[ -f "$1" ]] || { echo "Error: File not found" >&2; return 1; }
 
     # Implementation
@@ -656,7 +662,7 @@ This was a bug in versions prior to v2.0.1 where the `path` variable conflicted 
 If you're experiencing this:
 ```bash
 # Update to the latest version
-cd $KIT_EXT_DIR  # wherever you installed it
+cd "$KIT_EXT_DIR"  # wherever you installed it
 git pull  # or re-download
 
 # Reload your shell
@@ -669,7 +675,7 @@ exec zsh
 source ~/.zshrc
 
 # Or manually load (if KIT_EXT_DIR is set)
-source $KIT_EXT_DIR/loader.zsh
+source "$KIT_EXT_DIR/loader.zsh"
 ```
 
 ### Tab completion not working
@@ -682,10 +688,10 @@ exec zsh  # Restart shell
 ### Function not showing in help
 ```bash
 # Check category header has function listed
-grep "^# Functions:" $KIT_EXT_DIR/functions/category.sh
+grep "^# Functions:" "$KIT_EXT_DIR/functions/category.sh"
 
 # Reload functions
-source $KIT_EXT_DIR/loader.zsh
+source "$KIT_EXT_DIR/loader.zsh"
 ```
 
 ### Pre-existing aliases conflict
@@ -722,10 +728,10 @@ https://github.com/kristjanpikhof/kit-toolbox
 To uninstall Kit, use the built-in uninstall command:
 
 ```bash
-# Remove configuration only (keeps the kit-toolkit directory)
+# Remove configuration only (keeps the kit-toolbox directory)
 kit uninstall
 
-# Remove configuration AND delete the kit-toolkit directory
+# Remove configuration AND delete the kit-toolbox directory
 kit uninstall --purge
 ```
 
@@ -733,7 +739,7 @@ The uninstall command will:
 - Automatically detect your zsh config file (respects `ZDOTDIR`)
 - Create a timestamped backup before making changes
 - Remove the Kit configuration block from your config
-- Optionally delete the kit-toolkit directory with `--purge`
+- Optionally delete the kit-toolbox directory with `--purge`
 
 To apply changes after uninstalling:
 ```bash
@@ -755,8 +761,8 @@ If you prefer to uninstall manually:
 # 2. Reload your shell
 source ~/.zshrc
 
-# 3. Optionally, delete the kit-toolkit directory
-rm -rf $KIT_EXT_DIR  # wherever you installed it
+# 3. To delete the installation too, prefer the guarded built-in command:
+kit uninstall --purge
 ```
 
 ## Migration from Legacy Functions
@@ -911,7 +917,7 @@ sudo pacman -S yt-dlp ffmpeg lsd
 
 ## Environment Variables
 
-- **KIT_EXT_DIR** — Path to kit-toolkit directory (auto-detected during installation, no default)
+- **KIT_EXT_DIR** — Path to the kit-toolbox directory (auto-detected during installation, no default)
 - **KIT_AUTO_SHORTCUTS** — Enable/disable auto-generation of navigation shortcuts (default: `true`)
 - **KIT_AUTO_EDITORS** — Enable/disable auto-generation of editor shortcuts (default: `true`)
 
@@ -921,14 +927,14 @@ When `KIT_AUTO_SHORTCUTS=false` or `KIT_AUTO_EDITORS=false` is set before loadin
 
 Example:
 ```bash
-export KIT_EXT_DIR="/your/custom/location/kit-toolkit"
+export KIT_EXT_DIR="/your/custom/location/kit-toolbox"
 export KIT_AUTO_SHORTCUTS=false
 export KIT_AUTO_EDITORS=false
 ```
 
 ## Performance
 
-Functions are **pre-loaded** at shell startup for instant access. Loading takes ~50ms for all functions.
+Functions are preloaded when `loader.zsh` is sourced, so calls do not source category files again.
 
 Generated shortcut and editor functions are thin wrappers around internal handlers. Their target paths and editor commands are stored when Kit is sourced, so calls do not re-parse config files every time.
 
@@ -941,7 +947,7 @@ Generated shortcut and editor functions are thin wrappers around internal handle
 
 ## License
 
-Use freely. Modify as needed.
+Released under the [MIT License](LICENSE).
 
 ## Version
 

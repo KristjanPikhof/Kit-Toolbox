@@ -1,681 +1,162 @@
-# Kit Builder - Quick Reference
+# Kit Builder reference
 
-Quick reference for common scenarios, patterns, and troubleshooting.
+Use this page while implementing. Read [SKILL.md](SKILL.md) for the full
+workflow and [`kit_pattern.md`](../../../llm_prompts/kit_pattern.md) for the
+canonical repository pattern.
 
-## Workflow Quick Reference
+## Command reference
 
-### Standard Function Creation Flow
+| Task | Command | Shell note |
+|------|---------|------------|
+| Generate a skeleton | `bash scripts/new-function.sh <category> <name> "Description"` | Bash-only path detection; file is not executable |
+| Validate a module | `zsh scripts/validate-pattern.sh functions/<category>.sh` | Zsh script; file is not executable |
+| Verify completions | `./scripts/generate-completions.sh` | Executable Bash script; do not run with Zsh |
+| Smoke-test loader | `zsh -fc 'export KIT_EXT_DIR=$PWD; source loader.zsh; kit -h'` | Isolated Zsh |
+| Run focused suites | `zsh tests/test-<name>.zsh` | Hermetic except real FFmpeg/FFprobe in media suite |
+| Run integration | `zsh tests/run-tests.sh` | Recreates assets, may use network, prompts for cleanup |
 
-```bash
-# 1. Generate template
-cd $KIT_EXT_DIR
-./scripts/new-function.sh <category> <function-name> "<description>"
+Never execute `tests/run-tests.sh` directly. Its Bash shebang cannot load Kit’s
+Zsh-only functions.
 
-# 2. Edit the function (add implementation logic)
-$EDITOR functions/<category>.sh
+## Required module header
 
-# 3. Validate pattern compliance
-./scripts/validate-pattern.sh functions/<category>.sh
-
-# 4. Load and test
-source loader.zsh
-kit <function-name> -h
-kit <function-name> <test-input>
-
-# 5. Verify completions (optional - system is fully dynamic)
-./scripts/generate-completions.sh
-# Note: Completions auto-discover functions. Just reload your shell after adding new functions.
+```zsh
+# category.sh - Brief category description
+# Category: Display name
+# Description: What this module provides
+# Dependencies: tool1, tool2 (or "none")
+# Functions: function-one, function-two
 ```
 
----
+The loader and completion system discover public functions from `# Functions:`.
+Keep this line synchronized with the implementations.
 
-## Pattern Templates
+## Help and exit codes
 
-### Minimal Function Template
-
-```bash
-my-function() {
-    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
-        cat << EOF
-Usage: kit my-function <arg>
-Description: What it does
-EOF
-        return 0
-    fi
-
-    [[ -z "$1" ]] && { echo "Error: Missing arg" >&2; return 2; }
-
-    # Implementation here
-
-    echo "✅ Success"
-}
-```
-
-### File Processing Template
-
-```bash
-process-file() {
-    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
-        cat << EOF
-Usage: kit process-file <input> [output]
-Description: Process a file
-Examples:
-  kit process-file input.txt
-  kit process-file input.txt output.txt
-EOF
-        return 0
-    fi
-
-    # Validation
-    [[ -z "$1" ]] && { echo "Error: Missing input" >&2; return 2; }
-    [[ -f "$1" ]] || { echo "Error: File not found: $1" >&2; return 1; }
-
-    # Dependency check
-    command -v tool &>/dev/null || {
-        echo "Error: tool not installed. Install: brew install tool" >&2
-        return 1
-    }
-
-    # Process
-    local input="$1"
-    local output="${2:-${input%.*}_processed.${input##*.}}"
-
-    if ! tool "$input" -o "$output"; then
-        echo "Error: Processing failed" >&2
-        return 1
-    fi
-
-    echo "✅ Processed '$input' → '$output'"
-}
-```
-
-### Batch Processing Template
-
-```bash
-batch-process() {
-    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        cat << EOF
-Usage: kit batch-process [pattern]
-Description: Process multiple files
-Examples:
-  kit batch-process "*.txt"
-  kit batch-process
-EOF
-        return 0
-    fi
-
-    local pattern="${1:-*}"
-    local count=0
-    local processed=0
-
-    for file in $pattern; do
-        [[ -f "$file" ]] || continue
-        ((count++))
-
-        if process_single_file "$file"; then
-            ((processed++))
-            echo "Processed: $(basename "$file")"
-        else
-            echo "Failed: $(basename "$file")" >&2
-        fi
-    done
-
-    if [[ $count -eq 0 ]]; then
-        echo "No files found matching pattern"
-        return 0
-    fi
-
-    echo "✅ Processed $processed/$count files"
-}
-```
-
-### Options/Flags Template
-
-```bash
-function-with-options() {
-    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        cat << EOF
-Usage: kit function-with-options [options] <input>
+```text
+Usage: kit function-name [options] <required>
+Description: One precise sentence.
 Options:
-  -q, --quality NUM    Quality (default: 80)
-  -o, --output FILE    Output file
-  -v, --verbose        Verbose mode
-  -f, --force          Overwrite output file if it exists
+  -o, --output FILE  Write to FILE
+  -f, --force        Replace FILE only after successful processing
 Examples:
-  kit function-with-options input.txt
-  kit function-with-options -q 95 -o output.txt input.txt
-  kit function-with-options input.txt --force
-EOF
-        return 0
+  kit function-name input.ext
+  kit function-name input.ext --output result.ext
+```
+
+| Code | Meaning |
+|-----:|---------|
+| `0` | Help displayed or operation completed successfully |
+| `1` | Runtime failure, missing file/dependency, or destination conflict |
+| `2` | Invalid syntax, missing option value, invalid number/enum, or input/output identity |
+
+## Argument parsing
+
+Check consuming options before shifting:
+
+```zsh
+-o|--output)
+    if [[ $# -lt 2 || -z "$2" ]]; then
+        echo "Error: $1 requires a file" >&2
+        return 2
     fi
-
-    local quality=80
-    local output=""
-    local verbose=false
-    local force=false
-    local input=""
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -q|--quality)
-                quality="$2"
-                shift 2
-                ;;
-            -o|--output)
-                output="$2"
-                shift 2
-                ;;
-            -v|--verbose)
-                verbose=true
-                shift
-                ;;
-            -f|--force)
-                force=true
-                shift
-                ;;
-            *)
-                input="$1"
-                shift
-                ;;
-        esac
-    done
-
-    [[ -z "$input" ]] && { echo "Error: Missing input" >&2; return 2; }
-
-    # Determine output file
-    local output_file="${output:-${input%.*}_processed.${input##*.}}"
-
-    # Check if output exists (with force flag support)
-    if [[ -f "$output_file" ]]; then
-        if [[ "$force" == true ]]; then
-            echo "Warning: Overwriting existing file '$output_file'" >&2
-            rm -f "$output_file"
-        else
-            echo "Error: Output file '$output_file' already exists. Use --force to overwrite." >&2
-            return 1
-        fi
-    fi
-
-    # Use options in processing (with safer error handling)
-    $verbose && echo "Quality: $quality"
-
-    if ! process_command "$input" "$output_file"; then
-        echo "Error: Processing failed" >&2
-        return 1
-    fi
-
-    echo "✅ Processed with quality=$quality"
-}
+    output="$2"
+    shift 2
+    ;;
 ```
 
----
+Reject unknown flags and unexpected extra positional arguments. Validate digit
+syntax before arithmetic; use decimal coercion such as `$((10#$value))` when
+leading zeros are allowed.
 
-## Common Validation Patterns
+## Safe command execution
 
-### Required Argument
+```zsh
+local -a cmd=(required_tool --input "$input")
+[[ -n "$optional" ]] && cmd+=(--option "$optional")
+cmd+=(--output "$temporary")
 
-```bash
-if [[ -z "$1" ]]; then
-    echo "Error: Missing required argument" >&2
-    return 2
-fi
-```
-
-### File Exists
-
-```bash
-if [[ ! -f "$1" ]]; then
-    echo "Error: File '$1' does not exist" >&2
+if ! "${cmd[@]}"; then
+    echo "Error: Processing failed" >&2
     return 1
 fi
 ```
 
-### Directory Exists
+Quote paths, build argv arrays, and never evaluate user input. Shell characters
+inside a quoted filename are data, not code, so do not reject them wholesale.
 
-```bash
-if [[ ! -d "$1" ]]; then
-    echo "Error: Directory '$1' does not exist" >&2
-    return 1
+## Output safety
+
+File-producing commands follow this sequence:
+
+1. Normalize and compare input and output paths.
+2. Refuse an existing destination unless `--force` is explicit.
+3. Create a sibling temporary name that ends with the intended filename or
+   extension.
+4. Run the tool against that temporary path.
+5. Verify the result before installation.
+6. In normal mode, use a non-clobbering move and verify the temporary was
+   consumed. This catches a destination created during processing.
+7. In force mode, replace the destination only after processing succeeds.
+8. Remove temporary output on failure.
+
+Never pre-delete the destination. For FFmpeg work, call
+`_kit_media_run_ffmpeg` instead of duplicating this sequence.
+
+## Completion pattern
+
+```zsh
+if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+    _files
+    return 0
+fi
+if [[ "$current_word" == -* ]]; then
+    _values 'options' '-o' '--output' '-f' '--force'
+    return 0
 fi
 ```
 
-### File is Readable
-
-```bash
-if [[ ! -r "$1" ]]; then
-    echo "Error: File '$1' is not readable" >&2
-    return 1
-fi
-```
-
-### Valid Format/Extension
-
-```bash
-if [[ ! "$1" =~ \.(jpg|png|gif)$ ]]; then
-    echo "Error: File must be JPG, PNG, or GIF" >&2
-    return 2
-fi
-```
-
-### Numeric Value
-
-```bash
-if [[ ! "$quality" =~ ^[0-9]+$ ]] || [[ $quality -lt 1 || $quality -gt 100 ]]; then
-    echo "Error: Quality must be 1-100" >&2
-    return 2
-fi
-```
-
-### Command/Dependency
-
-```bash
-if ! command -v tool &>/dev/null; then
-    echo "Error: tool not installed. Install with: brew install package" >&2
-    return 1
-fi
-```
-
----
-
-## Error Handling Patterns
-
-### Simple Error Exit
-
-```bash
-[[ -f "$file" ]] || { echo "Error: File not found" >&2; return 1; }
-```
-
-### Safer Command Execution (Recommended)
-
-```bash
-# GOOD - Direct negation, exit code tied to command
-if ! operation_command "$input" "$output"; then
-    echo "Error: Operation failed" >&2
-    return 1
-fi
-
-# BAD - Fragile, using $? can break if code is added
-operation_command "$input" "$output"
-if [[ $? -ne 0 ]]; then
-    echo "Error: Operation failed" >&2
-    return 1
-fi
-```
-
-### Error with Cleanup
-
-```bash
-if ! operation; then
-    echo "Error: Operation failed" >&2
-    rm -f "$temp_file"  # Cleanup
-    return 1
-fi
-```
-
-### Trap for Cleanup
-
-```bash
-temp_file=$(mktemp) || { echo "Error: Cannot create temp file" >&2; return 1; }
-trap 'rm -f "$temp_file"' EXIT
-
-# Rest of function...
-```
-
-### Multiple Error Conditions
-
-```bash
-if ! command -v tool &>/dev/null; then
-    echo "Error: tool not installed" >&2
-    return 1
-elif [[ ! -f "$input" ]]; then
-    echo "Error: Input file not found" >&2
-    return 1
-elif [[ ! -w "$(dirname "$output")" ]]; then
-    echo "Error: Output directory not writable" >&2
-    return 1
-fi
-```
-
-### Output File Exists Check (with --force support)
-
-```bash
-# Check if output file exists
-if [[ -f "$output" ]]; then
-    if [[ "$force" == true ]]; then
-        echo "Warning: Overwriting existing file '$output'" >&2
-        rm -f "$output"
-    else
-        echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
-        return 1
-    fi
-fi
-```
-
----
-
-## Category File Header Format
-
-Every category file must have this header:
-
-```bash
-# category-name.sh - Brief description
-# Category: Display Name
-# Description: Detailed description of what functions in this category do
-# Dependencies: tool1, tool2, tool3 (or "none")
-# Functions: func1, func2, func3, func4
-```
-
-**Example:**
-
-```bash
-# images.sh - Image manipulation utilities
-# Category: Image Processing
-# Description: ImageMagick-based image manipulation and optimization utilities
-# Dependencies: imagemagick
-# Functions: img-resize, img-optimize, img-convert, img-thumbnail
-```
-
----
-
-## Exit Code Standards
-
-**ALWAYS use these exit codes:**
-
-- **0** = Success (operation completed successfully)
-- **1** = Runtime error (file not found, operation failed, dependency missing)
-- **2** = Usage error (missing required arguments, invalid format)
-
-**Examples:**
-
-```bash
-# Success
-echo "✅ Success"
-return 0
-
-# Missing required argument (usage error)
-echo "Error: Missing input file" >&2
-return 2
-
-# File not found (runtime error)
-echo "Error: File '$1' not found" >&2
-return 1
-
-# Dependency missing (runtime error)
-echo "Error: tool not installed" >&2
-return 1
-```
-
----
-
-## Testing Checklist
-
-```bash
-# Test 1: Help displays
-kit function-name -h
-kit function-name --help
-
-# Test 2: No arguments (should show help or error)
-kit function-name
-
-# Test 3: Invalid usage (exit code 2)
-kit function-name
-echo $?  # Should be 2
-
-# Test 4: File not found (exit code 1)
-kit function-name /nonexistent/file
-echo $?  # Should be 1
-
-# Test 5: Success case (exit code 0)
-kit function-name valid-input.txt
-echo $?  # Should be 0
-
-# Test 6: Edge cases
-kit function-name "file with spaces.txt"
-kit function-name empty-file.txt
-kit function-name very-large-file.txt
-```
-
----
-
-## Common Issues & Solutions
-
-### Issue: Function not found after creation
-
-**Solution:**
-```bash
-# Reload the toolkit
-source $KIT_EXT_DIR/loader.zsh
-
-# Or restart your shell
-exec zsh
-```
-
-### Issue: Pattern validation fails
-
-**Common causes:**
-- Missing help block
-- Function not listed in category header
-- No input validation
-- Errors not going to stderr
-- Wrong exit codes
-
-**Solution:**
-```bash
-# Read validation output carefully
-./scripts/validate-pattern.sh functions/category.sh
-
-# Fix issues one by one
-# Re-run validation
-```
-
-### Issue: Help block not displaying
-
-**Cause:** Help condition wrong
-
-**Fix:**
-```bash
-# CORRECT
-if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
-
-# WRONG (missing -z check for no args)
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-```
-
-### Issue: Errors not visible
-
-**Cause:** Not redirecting to stderr
-
-**Fix:**
-```bash
-# CORRECT
-echo "Error: Something failed" >&2
-
-# WRONG
-echo "Error: Something failed"
-```
-
-### Issue: Function exists but shows "command not found"
-
-**Cause:** Function name doesn't match in header
-
-**Fix:**
-Check that function name in:
-1. Function definition: `my-function() {`
-2. Category header Functions list: `# Functions: ..., my-function`
-
-### Issue: Tab completion not working
-
-**Solution:**
-```bash
-# The completion system is fully dynamic - just reload your shell
-exec zsh
-# or
-source ~/.zshrc
-
-# Verify the completion system is working
-./scripts/generate-completions.sh
-```
-
----
-
-## Dependency Detection
-
-### Common Tools and Packages
-
-| Tool | Homebrew Package | Check Command |
-|------|------------------|---------------|
-| ImageMagick | `brew install imagemagick` | `command -v magick` |
-| FFmpeg | `brew install ffmpeg` | `command -v ffmpeg` |
-| yt-dlp | `brew install yt-dlp` | `command -v yt-dlp` |
-| jq | `brew install jq` | `command -v jq` |
-| ripgrep | `brew install ripgrep` | `command -v rg` |
-| fd | `brew install fd` | `command -v fd` |
-| bat | `brew install bat` | `command -v bat` |
-| lsd | `brew install lsd` | `command -v lsd` |
-
-### Dependency Check Template
-
-```bash
-# Single dependency
-if ! command -v tool &>/dev/null; then
-    echo "Error: tool not installed. Install with: brew install package" >&2
-    return 1
-fi
-
-# Multiple dependencies
-for tool in tool1 tool2 tool3; do
-    if ! command -v "$tool" &>/dev/null; then
-        echo "Error: $tool not installed" >&2
-        return 1
-    fi
-done
-```
-
----
-
-## File Output Patterns
-
-### Same directory, modified name
-
-```bash
-local input="$1"
-local output="${input%.*}_processed.${input##*.}"
-# input.txt → input_processed.txt
-```
-
-### Different extension
-
-```bash
-local output="${input%.*}.jpg"
-# image.png → image.jpg
-```
-
-### Output directory
-
-```bash
-local output_dir="${2:-./output}"
-mkdir -p "$output_dir"
-local output="$output_dir/$(basename "$input")"
-```
-
-### Timestamped output
-
-```bash
-local timestamp=$(date +%Y%m%d_%H%M%S)
-local output="${input%.*}_${timestamp}.${input##*.}"
-# file.txt → file_20240115_143022.txt
-```
-
----
-
-## Progress Indication
-
-### Simple counter
-
-```bash
-echo "Processing $count files..."
-for file in *.txt; do
-    process "$file"
-done
-echo "✅ Processed $count files"
-```
-
-### Progress with current/total
-
-```bash
-local total=${#files[@]}
-local current=1
-for file in "${files[@]}"; do
-    echo "[$current/$total] Processing $(basename "$file")..."
-    process "$file"
-    ((current++))
-done
-```
-
-### Inline progress (overwrites line)
-
-```bash
-local current=1
-for file in *.txt; do
-    printf "\rProcessing %d/%d: %-50s" "$current" "$total" "$(basename "$file")"
-    process "$file"
-    ((current++))
-done
-printf "\n"
-```
-
----
-
-## Best Practices Summary
-
-1. **Always validate inputs** before processing
-2. **Check dependencies** before using them
-3. **Use proper exit codes** (0, 1, 2)
-4. **Send errors to stderr** (`>&2`)
-5. **Provide clear success messages**
-6. **Include installation instructions** in error messages
-7. **Handle edge cases** (empty files, spaces in names, special characters)
-8. **Test thoroughly** before considering complete
-9. **Document with examples** in help text
-10. **Follow naming conventions** (lowercase-with-hyphens)
-11. **Warn before destructive operations** (use `--force` flag with warning)
-12. **Use safer error handling** (`if ! command` instead of `$?`)
-13. **Sanitize user input** (reject shell metacharacters in filenames/paths)
-
----
-
-## Quick Command Reference
-
-```bash
-# Create function
-./scripts/new-function.sh images my-func "Description"
-
-# Validate
-./scripts/validate-pattern.sh functions/images.sh
-
-# Reload toolkit
-source $KIT_EXT_DIR/loader.zsh
-
-# Test
-kit my-func -h
-kit my-func test-input
-
-# Completions auto-update - just reload shell
-source ~/.zshrc
-
-# Verify completion system (optional)
-./scripts/generate-completions.sh
-
-# List all functions
-kit -h
-
-# Search functions
-kit --search keyword
-
-# List categories
-kit --list-categories
-```
-
----
-
-This reference provides quick access to the most common patterns and solutions when building toolkit functions.
+Handle consuming options before positional completion. Add regression checks to
+`tests/test-discovery-output.zsh`.
+
+## Dependency helpers
+
+| Helper | Use |
+|--------|-----|
+| `_kit_require <command>` | Standard public dependency error path |
+| `_kit_require_imagemagick` | ImageMagick v7 requirement |
+| `_kit_detect_os` | `macos`, `linux`, or `unknown` |
+| `_kit_detect_package_manager` | Supported package-manager identifier |
+| `_kit_get_package_install_cmd <package>` | Platform-specific install command |
+
+Do not duplicate these helpers in a new module unless the existing behavior is
+being intentionally refactored.
+
+## Verification matrix
+
+| Changed area | Required focused check |
+|--------------|------------------------|
+| Core parsers or module headers | `zsh tests/test-kit-core.zsh` |
+| Loader wrappers or config lifecycle | `zsh tests/test-loader-config.zsh` |
+| Help, search, categories, completions | `zsh tests/test-discovery-output.zsh` |
+| Media codecs, streams, outputs, downloader args | `zsh tests/test-media.zsh` |
+| Function module structure | `zsh scripts/validate-pattern.sh functions/<category>.sh` |
+| Zsh sources | `zsh -n loader.zsh lib/kit-core.zsh functions/*.sh completions/_kit tests/*.zsh` |
+| Bash scripts | `bash -n scripts/new-function.sh scripts/generate-completions.sh tests/run-tests.sh` |
+| Formatting | `git diff --check` |
+
+The full integration command is `zsh tests/run-tests.sh`. Use it when generated
+asset and live dispatcher coverage is needed.
+
+## Common failures
+
+| Symptom | Cause and fix |
+|---------|---------------|
+| Generator looks outside the repository | It was run with Zsh. Use `bash scripts/new-function.sh ...`. |
+| Pattern validator reports permission denied | Prefix the non-executable file with `zsh`. |
+| Integration runner fails while sourcing | It followed the Bash shebang. Use `zsh tests/run-tests.sh`. |
+| Output loses its container/format | Temporary filename no longer ends with the final extension. Preserve it. |
+| Existing output disappears after failed force | Destination was deleted too early. Process to a temporary sibling first. |
+| Subtitle stream disappears | FFmpeg mapping selected only video/audio. Map all streams, then exclude only the unwanted stream type. |
+| Odd width fails in libx264 | Normalize scaled dimensions to even values. |
+| `--output <TAB>` offers unrelated values | Completion handled position before the consuming option. Check the previous word first. |
