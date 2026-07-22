@@ -18,9 +18,9 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
 Usage: validate-pattern.sh [file.sh ...]
 Description: Validate function files against kit_pattern.md pattern requirements
 Examples:
-  ./scripts/validate-pattern.sh functions/images.sh
-  ./scripts/validate-pattern.sh functions/*.sh
-  ./scripts/validate-pattern.sh  # Validate all files
+  zsh scripts/validate-pattern.sh functions/images.sh
+  zsh scripts/validate-pattern.sh functions/*.sh
+  zsh scripts/validate-pattern.sh  # Validate all files
 
 Checks for:
   ✓ Category header present

@@ -20,9 +20,9 @@ Arguments:
   <description>    Brief description of what the function does
 
 Examples:
-  ./scripts/new-function.sh images resize-png "Resize PNG files to target width"
-  ./scripts/new-function.sh system check-disk "Check disk space usage"
-  ./scripts/new-function.sh media extract-audio "Extract audio from video file"
+  bash scripts/new-function.sh images resize-png "Resize PNG files to target width"
+  bash scripts/new-function.sh system check-disk "Check disk space usage"
+  bash scripts/new-function.sh media extract-audio "Extract audio from video file"
 
 The function template will be generated and added to the appropriate
 functions/category.sh file. The function follows all patterns from kit_pattern.md
@@ -64,7 +64,7 @@ fi
 TEMPLATE="
 # ${FUNC_NAME} - ${DESCRIPTION}
 ${FUNC_NAME}() {
-    if [[ \"\$1\" == \"-h\" || \"\$1\" == \"--help\" || -z \"\$1\" ]]; then
+    if [[ \"\$1\" == \"-h\" || \"\$1\" == \"--help\" ]]; then
         cat << 'HELP'
 Usage: kit ${FUNC_NAME} <required_arg>
 Description: ${DESCRIPTION}
@@ -123,5 +123,5 @@ echo "Next steps:"
 echo "  1. Edit the function in $FUNC_FILE"
 echo "  2. Replace placeholder implementation with actual code"
 echo "  3. Update input validation, dependencies, and error handling"
-echo "  4. Run: ./scripts/validate-pattern.sh functions/${CATEGORY}.sh"
+echo "  4. Run: zsh scripts/validate-pattern.sh functions/${CATEGORY}.sh"
 echo "  5. Test: kit $FUNC_NAME -h"

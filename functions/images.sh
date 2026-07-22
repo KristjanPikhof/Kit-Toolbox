@@ -30,14 +30,14 @@ Options:
   --start <number>       Starting number for sequential mode (default: 1)
 Examples:
   kit img-rename "photo 1.jpg"              # Sanitize: photo_1.jpg
-  kit img-rename "VR (Quest/similar).jpg"   # Sanitize: VR_Quest_similar.jpg
+  kit img-rename "VR (Quest~similar).jpg"   # Sanitize: VR_Quest_similar.jpg
   kit img-rename "  my image.png "          # Sanitize: my_image.png (trims spaces)
   kit img-rename . --sep "-"                # Sanitize all images in dir, use hyphens
   kit img-rename . --name "photo"           # Sequential: photo_1.jpg, photo_2.png
   kit img-rename . --name "img" --start 10  # Sequential: img_10.jpg, img_11.png
   kit img-rename . --recursive              # Process subdirectories too
   kit img-rename . --dry-run                # Preview changes without renaming
-Note: Sanitize mode replaces spaces and special chars (/, (, ), [, ], {, }, :, etc.)
+Note: Sanitize mode replaces spaces and special chars ((, ), [, ], {, }, :, ~, etc.)
 EOF
                 return 0
                 ;;

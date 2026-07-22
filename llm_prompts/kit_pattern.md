@@ -9,7 +9,7 @@ This document provides a comprehensive template for creating new extensions for 
 1. **Function-first Design**: Each extension is a single shell function
 2. **Self-documenting**: Every function includes built-in help
 3. **Error-resilient**: Comprehensive input validation and error handling
-4. **Security-first**: Input sanitization, safe command execution, force flag warnings
+4. **Security-first**: Semantic validation, quoted paths, array-based execution, and safe output installation
 5. **Consistent Interface**: Follow established naming and structure conventions
 
 ## Function Template
@@ -54,12 +54,6 @@ EOF
         return 2
     fi
 
-    # Security: Sanitize filename (prevent command injection)
-    if [[ "$input" =~ [\|\&\$\`\'\;\<\>] ]]; then
-        echo "Error: Filename contains invalid characters" >&2
-        return 2
-    fi
-
     # File validation
     if [[ ! -f "$input" ]]; then
         echo "Error: File '$input' does not exist" >&2
@@ -75,20 +69,33 @@ EOF
     # Determine output file
     local output="${input%.*}_processed.${input##*.}"
 
-    # Check if output exists (with force flag support)
-    if [[ -f "$output" ]]; then
-        if [[ "$force" == true ]]; then
-            echo "Warning: Overwriting existing file '$output'" >&2
-            rm -f "$output"
-        else
-            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
-            return 1
-        fi
+    if [[ "${input:A}" == "${output:A}" ]]; then
+        echo "Error: Input and output must be different files" >&2
+        return 2
     fi
 
-    # Main logic using safer error handling pattern
-    if ! command_that_can_fail "$input" "$output"; then
+    if [[ -e "$output" && "$force" != true ]]; then
+        echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+        return 1
+    fi
+
+    # Write to a sibling temporary path. Keeping the final filename at the end
+    # preserves the extension for tools that infer the container from it.
+    local output_dir="${output:h}"
+    local output_name="${output:t}"
+    local temporary="$output_dir/.kit-tmp.$$.$RANDOM.$output_name"
+
+    if ! command_that_can_fail "$input" "$temporary" || [[ ! -f "$temporary" ]]; then
+        rm -f -- "$temporary"
         echo "Error: Operation failed" >&2
+        return 1
+    fi
+
+    if [[ "$force" == true ]]; then
+        mv -f -- "$temporary" "$output" || { rm -f -- "$temporary"; return 1; }
+    elif ! mv -n -- "$temporary" "$output" || [[ -e "$temporary" ]]; then
+        rm -f -- "$temporary"
+        echo "Error: Refusing to replace output created during processing" >&2
         return 1
     fi
 
@@ -101,14 +108,14 @@ EOF
 ## Naming Conventions
 
 ### Function Names
-- **Format**: lowercase-with-hyphens (e.g., `resize-img`, `convert-bulk`, `git-status`)
-- **Action-first**: Start with verb describing the primary action
+- **Format**: lowercase-with-hyphens (e.g., `img-resize`, `convert-to-mp3`, `pdf-merge`)
+- **Consistent family**: Match the prefix or action style already used by the category
 - **Descriptive**: Clearly indicate function purpose
 - **Consistent**: Use established patterns from existing functions
 
 ### Examples
-- ✅ `resize-img`, `upscale-img`, `optimize-img` (image operations)
-- ✅ `convert-bulk`, `format-files` (batch operations)
+- ✅ `img-resize`, `img-thumbnail`, `img-optimize` (image operations)
+- ✅ `convert-to-mp3`, `compress-video`, `remove-audio` (media operations)
 - ❌ `imgresize`, `ResizeImage` (wrong case/underscores)
 - ❌ `do-stuff`, `process` (too vague)
 
@@ -160,7 +167,7 @@ This header is used for:
 # Category: Image Processing
 # Description: ImageMagick-based image manipulation and optimization utilities
 # Dependencies: imagemagick
-# Functions: resize-img, upscale-img, optimize-img, convert-bulk, convert-heic, optimize-to-webp
+# Functions: img-resize, img-thumbnail, img-optimize, img-convert, img-optimize-to-webp
 ```
 
 ## Error Handling Standards
@@ -223,22 +230,26 @@ if ! command -v magick &> /dev/null; then
 fi
 ```
 
-### Numeric Validation (prevents octal interpretation issues)
+### Numeric Validation
 ```bash
-# Validate port/number (reject leading zeros)
-if [[ ! "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1 ]] || [[ "$port" -gt 65535 ]]; then
+# Validate syntax before arithmetic, then force decimal interpretation.
+if [[ ! "$port" =~ ^[0-9]+$ ]]; then
+    echo "Error: Port must be a number" >&2
+    return 2
+fi
+local port_decimal=$((10#$port))
+if [[ "$port_decimal" -lt 1 || "$port_decimal" -gt 65535 ]]; then
     echo "Error: Port must be 1-65535" >&2
     return 2
 fi
 ```
 
-### Filename Sanitization (prevents command injection)
+### Safe Path Handling
 ```bash
-# Reject shell metacharacters in filenames
-if [[ "$filename" =~ [\|\&\$\`\'\;\<\>] ]]; then
-    echo "Error: Filename contains invalid characters" >&2
-    return 2
-fi
+# Safely quoted filenames may contain spaces, leading dots, and shell characters.
+[[ -f "$filename" ]] || { echo "Error: File not found: $filename" >&2; return 1; }
+local -a cmd=(required_tool -- "$filename")
+"${cmd[@]}"
 ```
 
 ## Security Best Practices
@@ -274,37 +285,20 @@ local cmd="ffmpeg -i $input -c:v libx264 -crf $crf $output"
 eval "$cmd"  # NEVER use eval with user input
 ```
 
-### 3. Force Flag with Warning
+### 3. Atomic Output Installation
 
 ```bash
-# Check if output exists (with force flag support)
-if [[ -f "$output" ]]; then
-    if [[ "$force" == true ]]; then
-        echo "Warning: Overwriting existing file '$output'" >&2
-        rm -f "$output"
-    else
-        echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
-        return 1
-    fi
-fi
+# Never delete the destination before processing. Write and validate a sibling
+# temporary file, then use mv -n for normal mode or mv -f for explicit force.
+# Re-check that mv -n consumed the temporary file to detect a concurrent writer.
 ```
 
-### 4. Path Traversal Prevention
+### 4. Confined Path Validation
 
 ```bash
-# Check for path traversal attempts
-if [[ "$path" == *"../"* ]] || [[ "$path" == *"/.."* ]]; then
-    echo "Error: Path contains traversal sequences" >&2
-    return 1
-fi
-
-# Allow ~/ for home directory but reject ~user
-if [[ "$path" == "~" ]] || [[ "$path" == "~/"* ]]; then
-    if [[ "$path" != "~/"* ]]; then
-        echo "Error: Invalid home directory path" >&2
-        return 1
-    fi
-fi
+# Only enforce containment when the function promises to stay within a root.
+# Resolve both paths, then compare the canonical candidate with the canonical
+# allowed root. Do not reject ordinary ../ segments for unconstrained file tools.
 ```
 
 ### 5. Shell Identifier Validation
@@ -346,8 +340,8 @@ EOF
 
 ### Manual Testing Checklist
 - [ ] `kit function-name -h` shows help
-- [ ] `kit function-name` (no args) shows usage
-- [ ] Missing required args return exit code 2
+- [ ] `kit function-name -h` and `--help` show usage
+- [ ] Missing required args return exit code 2, unless no-argument help is explicitly part of the interface
 - [ ] Invalid inputs return appropriate errors
 - [ ] Successful execution returns 0 and shows confirmation
 - [ ] Dependencies properly checked
@@ -438,7 +432,8 @@ local -a ffmpeg_cmd=(ffmpeg -i "$input" -c:v libx264 -crf "$crf")
 
 # Add optional arguments conditionally
 if [[ "$width" != "-1" ]]; then
-    ffmpeg_cmd+=(-vf "scale=$width:-1")
+    local scale_filter="scale='trunc(min(iw,$width)/2)*2':-2"
+    ffmpeg_cmd+=(-vf "$scale_filter")
 fi
 
 ffmpeg_cmd+=(-movflags +faststart "$output")
@@ -488,15 +483,15 @@ fi
 - [ ] Category header updated with new function name
 - [ ] Help block present and comprehensive
 - [ ] Input validation implemented (required args, file existence, type checking)
-- [ ] **Input sanitization** (reject shell metacharacters in filenames/paths)
+- [ ] **Safe path handling** (quoted expansions; spaces, leading dots, and shell characters tested)
 - [ ] Error messages go to stderr with appropriate codes
 - [ ] **Safer error handling** (use `if ! command` not `$?`)
-- [ ] **Force flag warning** (warn before overwriting if applicable)
+- [ ] **Atomic output handling** (no pre-delete; failed force keeps the original; no-force detects races)
 - [ ] Dependencies checked before use
 - [ ] **Array-based command building** for complex commands
 - [ ] Code follows shell best practices
 - [ ] Manual testing passes all scenarios
-- [ ] Pattern validation passes (`./scripts/validate-pattern.sh`)
+- [ ] Pattern validation passes (`zsh scripts/validate-pattern.sh`)
 
 ## Development Tools
 
@@ -505,15 +500,15 @@ The toolkit includes helper scripts to make development easier:
 ### Template Generator
 Generate a new function template:
 ```bash
-./scripts/new-function.sh images resize-png "Resize PNG files"
+bash scripts/new-function.sh images resize-png "Resize PNG files"
 ```
 
 Creates a skeleton function in `functions/images.sh` with all required sections.
 
 ### Pattern Validator
 Check if functions follow this pattern:
-```bash
-./scripts/validate-pattern.sh functions/images.sh
+```zsh
+zsh scripts/validate-pattern.sh functions/images.sh
 ```
 
 Verifies:
@@ -554,7 +549,7 @@ source ~/.zshrc
 
 1. **Generate template:**
    ```bash
-   ./scripts/new-function.sh category function-name "Description"
+   bash scripts/new-function.sh category function-name "Description"
    ```
 
 2. **Edit `functions/category.sh`:**
@@ -563,8 +558,8 @@ source ~/.zshrc
    - Test the function
 
 3. **Validate:**
-   ```bash
-   ./scripts/validate-pattern.sh functions/category.sh
+   ```zsh
+   zsh scripts/validate-pattern.sh functions/category.sh
    ```
 
 4. **Update completions:**

@@ -1,274 +1,140 @@
-# Kit's Toolkit - Test Suite
+# Kit's Toolkit test suite
 
-Comprehensive test suite that verifies all toolkit functionality with a single command.
+The repository has four hermetic focused suites and one interactive integration runner.
 
-**Shell Compatibility:** The test suite works with both **bash** and **zsh**.
+> **Run the integration suite with Zsh from the repository root.** Do not use
+> `./tests/run-tests.sh`: its Bash shebang cannot load the Zsh-only toolkit.
+> The integration runner deletes and recreates `tests/assets`, may access
+> YouTube, and prompts before final cleanup.
 
-## Quick Start
+## Run the tests
 
-```bash
-cd tests
-./run-tests.sh          # Run all tests
-./run-tests.sh -v       # Run with verbose output
-./run-tests.sh -h       # Show help
+Use the focused suites for fast, repeatable checks:
+
+```zsh
+for test in tests/test-{kit-core,loader-config,discovery-output,media}.zsh; do
+  zsh "$test" || break
+done
 ```
 
-## Test Overview
+Run the full integration suite when external tools and interactive prompts are
+appropriate:
 
-The test suite verifies integration and characterization tests across all toolkit categories:
-
-| Category | Tests | Coverage |
-|----------|-------|----------|
-| Image Processing | 17 | Help + functional tests for resize, optimize, convert, thumbnail, rename |
-| Media Processing | Up to 11 suite entries + 55 focused assertions | Help, codec/bitrate, stream preservation, no-upscale sizing, overwrite safety, validation, and downloader arguments |
-| System Utilities | 5 | Help + functional tests for mklink, killports, update, uninstall |
-| Core & Navigation | 3 | Dispatcher, help, search, categories |
-| Loader Characterization | 3 | Hermetic kit-core, shortcut/editor dispatch, discovery/completion output |
-| File Listing | 4 | Help tests for list-files, list-all, list-reverse, list-tree |
-
-## Test Stages
-
-### Step 1: Dependency Check
-
-Runs `kit deps-check` to verify all dependencies are installed:
-
-```
-Checking Kit toolkit dependencies...
-✓ imagemagick - ImageMagick v7+ for image processing
-✓ yt-dlp - YouTube/media downloader
-✓ ffmpeg - Video/audio processing
-✓ lsd - Enhanced file listing
-✓ lsof - List open files (for killports)
+```zsh
+zsh tests/run-tests.sh          # Run all integration entries
+zsh tests/run-tests.sh -v       # Re-run failures with detailed output
+zsh tests/run-tests.sh -h       # Show runner help
 ```
 
-**If dependencies are missing**, the test will show:
-- Which packages are missing
-- Installation commands for your platform (brew, apt, dnf, pacman, etc.)
+## Choose the right suite
 
-### Step 2: Test Asset Setup
+| Suite | Assertions or entries | What it covers | External requirements |
+|-------|----------------------:|----------------|-----------------------|
+| `test-kit-core.zsh` | 43 assertions | Config parsing, identifiers, module headers | None |
+| `test-loader-config.zsh` | 89 assertions | Shortcut/editor dispatch, conflicts, re-source behavior | None |
+| `test-discovery-output.zsh` | 43 assertions | Help, search, categories, and completion positions | None |
+| `test-media.zsh` | 55 assertions | FFmpeg output safety, codecs, streams, sizing, and fake `yt-dlp` arguments | `ffmpeg`, `ffprobe` |
+| `run-tests.sh` | Up to 51 entries | Cross-category integration plus all four focused suites | Toolkit dependencies; network for live YouTube coverage |
 
-Automatically generates test assets:
+The integration total is conditional. Functional entries run only when their
+assets and dependencies are available, and the live YouTube entry can be
+skipped when `yt-dlp`, the network, or the test video is unavailable.
 
-```
-Created test asset directories:
-  tests/assets/images/
-  tests/assets/video/
-  tests/assets/audio/
-```
+## Understand the integration run
 
-**Generated test images:**
-- `test_input_1920x1080.jpg` - Large image for optimization tests
-- `test_input_800x600.jpg` - Medium image for resize tests
-- `test_input_small.jpg` - Small image for thumbnail tests
-- `test_input_large.jpg` - Extra large image
-- `test photo with spaces.jpg` - Tests filename with spaces
-- `test-photo(VR~quest).jpg` - Tests special character handling
-- `test_input.webp` - WebP format for conversion tests
+The runner performs these steps:
 
-**Generated test video:**
-- `test_input_video.mp4` - 5-second test video with audio (640x360)
+1. Sources `loader.zsh` and runs `kit deps-check`.
+2. Prompts before continuing when dependencies are missing.
+3. Deletes and recreates `tests/assets`.
+4. Generates image, video, audio, and PDF fixture directories.
+5. Runs help, functional, dispatcher, focused, and file-listing checks.
+6. Downloads a short YouTube video when possible, then compresses it, extracts
+   MP3 audio, and removes its audio streams.
+7. Prints totals and generated files, then asks whether to delete the assets.
 
-### Step 3: Run Tests
+### Generated assets
 
-Tests all toolkit functions using the `kit <command>` format (same as users use):
+| Directory | Typical fixtures |
+|-----------|------------------|
+| `tests/assets/images/` | JPEG/WebP inputs, including spaces and special characters |
+| `tests/assets/video/` | Five-second 640x360 video with AAC audio; optional YouTube outputs |
+| `tests/assets/audio/` | Audio workspace |
+| `tests/assets/pdf/` | Two-page PDF and split, merged, compressed, rotated, and burst outputs |
 
-**Image Processing Tests:**
-```bash
-kit img-resize-width 400 test_input_800x600.jpg
-kit img-optimize test_input_1920x1080.jpg
-kit img-optimize-to-webp test_input_1920x1080.jpg
-kit img-thumbnail 150 test_input_small.jpg
-kit img-rename "test photo with spaces.jpg" --dry-run
-# ... and 13 more image tests
-```
+The live network test uses `https://youtu.be/1SBxsv_T_Jw`. A failed or missing
+download is reported as skipped rather than failed.
 
-**Media Processing Tests:**
-```bash
-zsh tests/test-media.zsh  # Hermetic; uses generated media and a fake yt-dlp
-kit compress-video test_input_video.mp4 -o test_input_video_compressed.mp4
-kit remove-audio test_input_video.mp4
-kit yt-download mp4 "https://youtu.be/1SBxsv_T_Jw"  # Downloads real video
-# Processes downloaded: compress → mp3 → remove-audio
-```
+## Read the output
 
-The focused media suite verifies MP3 presets and custom bitrates, hidden outputs, subtitle-preserving audio removal, odd-width normalization, concurrent overwrite refusal, invalid options, balanced `audio-quality` defaults, and explicit MP4 remux arguments without network access.
+Each integration entry is reported as `[PASS]`, `[FAIL]`, or `[SKIP]`. A
+successful fully provisioned run currently ends with:
 
-**System Utilities Tests:**
-```bash
-kit mklink source.txt link.txt
-kit killports -h
-kit update -h
-kit uninstall -h
-```
-
-**Core Tests:**
-```bash
-kit -h                    # Main help
-kit --list-categories     # List all categories
-kit --search resize       # Search functions
-```
-
-**Loader characterization tests (hermetic, no external deps):**
-```bash
-zsh tests/test-kit-core.zsh
-zsh tests/test-loader-config.zsh
-zsh tests/test-discovery-output.zsh
-```
-
-These are also run automatically by `run-tests.sh`.
-
-### Step 4: Cleanup Prompt
-
-After tests complete, shows generated files and offers cleanup:
-
-```
-Generated Test Files:
-  test_input_800x600-resized.jpg
-  test_input_small-resized.jpg
-  test_input_1920x1080-optimized.jpg
-  test_input_video_compressed.mp4
-  test_input_video_noaudio.mp4
-  ...
-
-Test complete! Clean up test assets?
-Options:
-  [Y]es - Delete all test assets
-  [N]o  - Keep assets for inspection
-```
-
-## YouTube Download Test
-
-The suite downloads a real short video for comprehensive media testing:
-
-- **URL:** `https://youtu.be/1SBxsv_T_Jw` (15-second Minecraft video)
-- **Format:** MP4 with embedded thumbnail and metadata when supported
-- **Processing chain:**
-  1. Downloads video (creates `Minecraft in 15 seconds [1SBxsv_T_Jw].mp4`)
-  2. Compresses the downloaded video
-  3. Extracts audio to MP3
-  4. Removes audio track
-
-**Note:** This test requires network access. If offline, the test is gracefully skipped.
-
-## File Naming Conventions
-
-The test suite uses clear naming to distinguish input from output files:
-
-**Input files** (test assets to be processed):
-- `test_input_1920x1080.jpg` - Original large image
-- `test_input_800x600.jpg` - Original medium image
-- `test_input_small.jpg` - Original small image
-- `test_input_video.mp4` - Original test video
-
-**Output files** (results of processing):
-- `test_input_800x600-resized.jpg` - Resized image output
-- `test_input_1920x1080-optimized.jpg` - Optimized image output
-- `test_input_small-resized.jpg` - Thumbnail output
-- `test_input_video_compressed.mp4` - Compressed video output
-- `test_input_video_noaudio.mp4` - Video without audio output
-- `youtube_compressed.mp4` - Compressed YouTube video
-- `<youtube_title>.mp3` - Extracted MP3 from YouTube video
-- `<youtube_title>_noaudio.mp4` - YouTube video without audio
-
-## Test Output
-
-**All tests passing:**
-```
-✅ All tests passed!
-
-Total:   39
-Passed:  39
+```text
+All tests passed!
+Total:   51
+Passed:  51
 Failed:  0
 Skipped: 0
 ```
 
-**With failures:**
-```
-❌ Some tests failed
+Counts can be lower when dependency-gated functional entries are not created,
+or include skips when the live download is unavailable. With `--verbose`, a
+failed entry is repeated without output suppression.
 
-Total:   39
-Passed:  35
-Failed:  3
-Skipped: 1
-```
+## Run a manual fixture check
 
-Failed tests are re-run with full output to help diagnose issues.
+Generate the fixtures with the integration runner and choose `N` at the cleanup
+prompt. Then run commands from the repository root or the relevant asset
+directory:
 
-## Running Individual Tests
-
-To test a specific function manually:
-
-```bash
-# From the tests/assets directory
+```zsh
 cd tests/assets/images
-
-# Test image resize
 kit img-resize-width 400 test_input_800x600.jpg
-ls -la test_input_800x600-resized.jpg
-
-# Test optimization
-kit img-optimize test_input_1920x1080.jpg
-ls -la test_input_1920x1080-optimized.jpg
+test -f test_input_800x600-resized.jpg
 ```
 
-## Troubleshooting
+The next integration run removes any retained `tests/assets` directory before
+creating fresh fixtures.
 
-### "Dependencies missing" error
+## Add coverage
 
-Run `kit deps-install` to install missing dependencies, then re-run tests.
+Add focused assertions for contracts that can be tested hermetically. Add an
+integration entry when the behavior needs generated assets or the public
+`kit <command>` dispatch path.
 
-### YouTube test fails / skipped
-
-- Check network connection
-- Verify yt-dlp is installed: `command -v yt-dlp`
-- Try manually: `kit yt-download mp4 "https://youtu.be/1SBxsv_T_Jw"`
-
-### "Permission denied" errors
-
-Ensure the test script is executable:
-```bash
-chmod +x tests/run-tests.sh
-```
-
-### Assets directory issues
-
-The test suite automatically cleans and recreates assets. If you see errors:
-```bash
-rm -rf tests/assets
-./tests/run-tests.sh
-```
-
-## Adding New Tests
-
-When adding a new function to the toolkit, add corresponding tests to `run-tests.sh`:
-
-1. **Help test:** Verify `-h` flag works
-2. **Functional test:** Test actual operation with test assets
-3. **Edge case test:** Test with special filenames if applicable
-
-Example test addition:
-```bash
-# Help test
+```zsh
+# Help entry in tests/run-tests.sh
 run_test "my-function: help works" "kit my-function -h"
 
-# Functional test (if applicable)
-cd "$ASSETS_DIR"
+# Functional entry inside the appropriate asset-directory guard
 run_test "my-function: functional test" \
-    "kit my-function test_input.txt && [[ -f 'expected_output.txt' ]]"
-cd - >/dev/null
+  "kit my-function test_input.txt && [[ -f 'expected_output.txt' ]]"
 ```
 
-## Test Suite Files
+Cover invalid values, filenames with spaces or leading dots, existing outputs,
+failed force operations, input/output identity, and completion positions when
+those contracts apply.
 
-```
+## Troubleshoot failures
+
+| Symptom | Action |
+|---------|--------|
+| Toolkit fails while loading | Confirm the command starts with `zsh tests/run-tests.sh`, not `./tests/run-tests.sh` or `bash tests/run-tests.sh`. |
+| Dependencies are missing | Run `kit deps-check`, then `kit deps-install` if you want the full integration coverage. |
+| YouTube entry skips | Check `command -v yt-dlp` and network access; the focused media suite tests downloader arguments without the network. |
+| Personal shortcuts/editors fail validation | Run `zsh tests/test-loader-config.zsh`; personal config paths are outside the hermetic repository gate. |
+| Retained assets are in the way | Inspect anything needed, then run the integration suite, which recreates the directory itself. |
+
+## Test files
+
+```text
 tests/
-├── run-tests.sh          # Main test runner (integration + characterization)
-├── test-kit-core.zsh     # Hermetic kit-core helper tests
-├── test-loader-config.zsh # Hermetic shortcut/editor dispatch tests
-├── test-discovery-output.zsh # Hermetic help/completion output tests
-├── README.md             # This file
-└── assets/               # Generated during test run (not in git)
-    ├── images/           # Test images
-    ├── video/            # Test videos
-    └── audio/            # Test audio files
+├── run-tests.sh               # Interactive integration runner
+├── test-kit-core.zsh          # Core helper assertions
+├── test-loader-config.zsh     # Shortcut/editor lifecycle assertions
+├── test-discovery-output.zsh  # Help and completion assertions
+├── test-media.zsh             # Media contract assertions
+├── README.md                  # This guide
+└── assets/                    # Generated and ignored
 ```

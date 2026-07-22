@@ -20,8 +20,8 @@ When asked to add a new function to the toolkit:
 Categories organize functions by purpose. Examples:
 - **images**: Image processing (ImageMagick-based)
 - **media**: Video/audio processing (ffmpeg, yt-dlp)
-- **system**: System utilities (symlinks, editors, etc.)
-- **aliases**: Navigation shortcuts (goto-*, etc.)
+- **system**: Shell and filesystem utilities
+- **aliases**: Navigation shortcut helpers
 - **lsd**: File listing enhancements
 
 **Decision Tree:**
@@ -35,18 +35,18 @@ Categories organize functions by purpose. Examples:
 If creating a new category:
 1. Create `functions/mycategory.sh` with proper headers
 2. Add entry to `categories.conf`
-3. Update `llm_prompts/kit_pattern.md` with new category
+3. Add discovery, completion, and functional coverage as appropriate
 
 ### Step 2: Generate Function Template
 
 ```bash
-cd $KIT_EXT_DIR  # wherever you installed kit-toolkit
-./scripts/new-function.sh <category> <function-name> <description>
+cd "$KIT_EXT_DIR"
+bash scripts/new-function.sh <category> <function-name> <description>
 ```
 
 Example:
 ```bash
-./scripts/new-function.sh images resize-png "Resize PNG files to specific width"
+bash scripts/new-function.sh images resize-png "Resize PNG files to specific width"
 ```
 
 This creates a template with:
@@ -68,7 +68,8 @@ Edit `functions/category.sh` and replace the placeholder with actual implementat
 - [ ] Error messages go to stderr (`echo "..." >&2`)
 - [ ] Success returns exit code 0
 - [ ] Success message explains what was created/modified
-- [ ] **Security:** Input sanitization (reject shell metacharacters in filenames/paths)
+- [ ] **Security:** Quote path expansions and build complex commands as arrays
+- [ ] **Output safety:** Reject input/output identity and avoid exposing partial output
 - [ ] **Security:** Use `if ! command` pattern instead of `$?` for error handling
 - [ ] **Security:** Use array-based command building for complex commands (see `kit_pattern.md`)
 
@@ -77,7 +78,7 @@ Edit `functions/category.sh` and replace the placeholder with actual implementat
 ```bash
 my-function() {
     # Help block - ALWAYS FIRST
-    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
 Usage: kit my-function <input_file> [output_file]
 Description: Brief description of what function does
@@ -103,10 +104,26 @@ EOF
         return 1
     fi
 
-    # Main logic
+    # Main logic. File-producing commands should write to a temporary sibling
+    # and install it only after the command succeeds; see functions/media.sh.
     local output="${2:-output.txt}"
-    if ! required_tool "$1" > "$output"; then
+    if [[ "$output" == "$1" ]]; then
+        echo "Error: Input and output must be different files" >&2
+        return 2
+    fi
+    if [[ -e "$output" ]]; then
+        echo "Error: Output file '$output' already exists" >&2
+        return 1
+    fi
+    local temp_output="${output}.tmp.$$.$RANDOM"
+    if ! required_tool "$1" > "$temp_output"; then
+        rm -f -- "$temp_output"
         echo "Error: Failed to process file" >&2
+        return 1
+    fi
+    if ! mv -n -- "$temp_output" "$output" || [[ -e "$temp_output" ]]; then
+        rm -f -- "$temp_output"
+        echo "Error: Refusing to replace output created during processing" >&2
         return 1
     fi
 
@@ -129,8 +146,8 @@ Make sure the file header documents your new function:
 
 ### Step 5: Validate the Implementation
 
-```bash
-./scripts/validate-pattern.sh functions/category.sh
+```zsh
+zsh scripts/validate-pattern.sh functions/category.sh
 ```
 
 Checklist:
@@ -144,15 +161,15 @@ Checklist:
 
 ### Step 6: Manual Testing
 
-```bash
+```zsh
 # Load the functions
 source loader.zsh
 
 # Test help
 kit my-function -h
 
-# Test with missing arguments
-kit my-function  # Should show error and return 2
+# Test with missing arguments (return 2 unless no-argument help is intentional)
+kit my-function
 
 # Test with invalid input
 kit my-function nonexistent.txt  # Should show error and return 1
@@ -165,17 +182,22 @@ kit my-function valid.txt  # Should succeed
 
 After your function is implemented and manually tested, run the full test suite to ensure nothing is broken:
 
-```bash
-cd tests
-./run-tests.sh
+```zsh
+zsh tests/run-tests.sh
 ```
 
 The test suite:
-- Validates all 39 existing tests still pass
+- Runs up to 51 integration entries on a fully provisioned machine
 - Checks dependencies are installed
 - Auto-generates test assets
 - Tests using the same `kit <command>` format users use
+- Runs the focused core, loader, discovery/completion, and media suites
+- Performs a live YouTube download when `yt-dlp` and the network are available
 - Shows detailed results for any failures
+
+Run it with Zsh from the repository root. `./tests/run-tests.sh` follows the
+Bash shebang and cannot load the Zsh-only toolkit. The suite deletes and
+recreates `tests/assets` and prompts before final cleanup.
 
 **If tests fail:**
 1. Check if your changes affected existing functionality
@@ -336,10 +358,10 @@ EOF
 
 ## Naming Conventions
 
-- **Function names**: lowercase-with-hyphens (e.g., `resize-img`, `yt-download`)
-- **Avoid verbs that are too generic**: Use `resize-img` not just `resize`
-- **Avoid prefixes**: Use `resize-img` not `img-resize`
-- **Group related functions**: `resize-img`, `upscale-img`, `optimize-img`
+- **Function names**: lowercase-with-hyphens (e.g., `img-resize`, `yt-download`)
+- **Avoid names that are too generic**: Use `img-resize` not just `resize`
+- **Match the existing family**: image functions use `img-*`; media functions use established action names such as `compress-video`
+- **Keep related functions consistent**: `img-resize`, `img-thumbnail`, `img-optimize`
 
 ## Exit Codes
 
@@ -372,7 +394,7 @@ echo "Error: Input file '$1' does not exist. Check path and try again." >&2
 kit my-function -h
 
 # Test invalid input
-kit my-function          # Should return 2
+kit my-function          # Returns 0 for documented no-argument help, otherwise 2
 kit my-function missing  # Should return 1
 
 # Test valid input
@@ -384,7 +406,7 @@ kit my-function valid    # Should return 0 and show success message
 Refer to:
 - `llm_prompts/kit_pattern.md` - Complete pattern specification
 - Existing functions in `functions/*.sh` - Real examples
-- `SKILL.md` - Overview of the toolkit structure
+- `.claude/skills/kit-builder/SKILL.md` - Agent workflow for extending the toolkit
 
 ---
 

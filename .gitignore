@@ -52,6 +52,7 @@ tmp/
 .opencode/plans/
 .opencode/node_modules/
 .opencode/settings.*
+.trekoon/
 
 # Test files
 tests/assets/
