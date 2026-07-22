@@ -20,7 +20,7 @@ The test suite verifies integration and characterization tests across all toolki
 | Category | Tests | Coverage |
 |----------|-------|----------|
 | Image Processing | 17 | Help + functional tests for resize, optimize, convert, thumbnail, rename |
-| Media Processing | 9 | Help + functional tests for compress, remove-audio, convert-to-mp3, yt-download |
+| Media Processing | Up to 11 suite entries + 55 focused assertions | Help, codec/bitrate, stream preservation, no-upscale sizing, overwrite safety, validation, and downloader arguments |
 | System Utilities | 5 | Help + functional tests for mklink, killports, update, uninstall |
 | Core & Navigation | 3 | Dispatcher, help, search, categories |
 | Loader Characterization | 3 | Hermetic kit-core, shortcut/editor dispatch, discovery/completion output |
@@ -84,11 +84,14 @@ kit img-rename "test photo with spaces.jpg" --dry-run
 
 **Media Processing Tests:**
 ```bash
+zsh tests/test-media.zsh  # Hermetic; uses generated media and a fake yt-dlp
 kit compress-video test_input_video.mp4 -o test_input_video_compressed.mp4
 kit remove-audio test_input_video.mp4
 kit yt-download mp4 "https://youtu.be/1SBxsv_T_Jw"  # Downloads real video
 # Processes downloaded: compress → mp3 → remove-audio
 ```
+
+The focused media suite verifies MP3 presets and custom bitrates, hidden outputs, subtitle-preserving audio removal, odd-width normalization, concurrent overwrite refusal, invalid options, balanced `audio-quality` defaults, and explicit MP4 remux arguments without network access.
 
 **System Utilities Tests:**
 ```bash
@@ -138,9 +141,9 @@ Options:
 The suite downloads a real short video for comprehensive media testing:
 
 - **URL:** `https://youtu.be/1SBxsv_T_Jw` (15-second Minecraft video)
-- **Format:** MKV with embedded thumbnail and metadata
+- **Format:** MP4 with embedded thumbnail and metadata when supported
 - **Processing chain:**
-  1. Downloads video (creates `Minecraft in 15 seconds [1SBxsv_T_Jw].mkv`)
+  1. Downloads video (creates `Minecraft in 15 seconds [1SBxsv_T_Jw].mp4`)
   2. Compresses the downloaded video
   3. Extracts audio to MP3
   4. Removes audio track

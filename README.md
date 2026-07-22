@@ -149,10 +149,10 @@ Process images using ImageMagick:
 
 ### 🎬 Media Processing
 Download and process video/audio:
-- **yt-download** — Download YouTube videos/audio (mp3 or mp4)
-- **remove-audio** — Remove audio track from video
-- **convert-to-mp3** — Extract audio and convert to MP3
-- **compress-video** — Compress video files for uploads (supports CRF, preset, width, bitrate options)
+- **yt-download** — Download YouTube audio as balanced-quality MP3 or explicitly remux video to MP4
+- **remove-audio** — Remove audio with a lossless video stream copy by default
+- **convert-to-mp3** — Extract audio using speech, compact, standard, high, or maximum MP3 profiles
+- **compress-video** — Compress video with CRF, a no-upscale maximum width, and configurable audio bitrate
 
 ### 📄 PDF Processing
 Split, merge, compress, and rotate PDF files:
@@ -288,7 +288,8 @@ kit-toolkit/
 │   ├── run-tests.sh          # Main integration test runner
 │   ├── test-kit-core.zsh     # Hermetic kit-core helper tests
 │   ├── test-loader-config.zsh # Hermetic shortcut/editor dispatch tests
-│   └── test-discovery-output.zsh # Hermetic help/completion output tests
+│   ├── test-discovery-output.zsh # Hermetic help/completion output tests
+│   └── test-media.zsh        # Hermetic media conversion contract tests
 │
 └── llm_prompts/              # AI development guides
     └── kit_pattern.md        # Complete pattern specification
@@ -353,6 +354,44 @@ $ kit compress-video video.mp4 -c 28 -o small.mp4
 $ kit compress-video video.mp4 --width 1920 --preset medium
 ```
 
+#### Audio Conversion and Download Examples
+
+`convert-to-mp3` uses the `standard` VBR profile by default instead of forcing 320kbps. Use `speech` for voice recordings or set an exact bitrate when output size needs to be predictable.
+
+```bash
+# Balanced VBR; preserves the source channel count and sample rate
+kit convert-to-mp3 recording.m4a
+
+# Small voice recording: 48kbps mono at 24kHz
+kit convert-to-mp3 recording.m4a --preset speech
+
+# Exact bitrate and custom output
+kit convert-to-mp3 music.m4a --bitrate 128 --output music.mp3
+
+# yt-dlp audio-quality 5 is the balanced MP3 default; explicit bitrates also work
+kit yt-download mp3 "https://youtube.com/watch?v=..."
+kit yt-download mp3 "https://youtube.com/watch?v=..." 128K
+
+# MP4 mode explicitly requests an MP4 merge/remux result
+kit yt-download mp4 "https://youtube.com/watch?v=..."
+```
+
+| MP3 preset | Encoding | Suggested use |
+|------------|----------|---------------|
+| `speech` | 48kbps mono, 24kHz | Meetings, interviews, voice notes |
+| `compact` | VBR quality 7 | Small files where some quality loss is acceptable |
+| `standard` | VBR quality 5 | Default general-purpose conversion |
+| `high` | VBR quality 2 | Music and quality-sensitive material |
+| `maximum` | Constant 320kbps | Explicit maximum bitrate only |
+
+`remove-audio` performs a video stream copy, so it is fast and does not reduce video quality. Use `--reencode` only when H.264 conversion is required. All local FFmpeg commands write to a temporary sibling file first; `--force` replaces an existing output only after conversion succeeds.
+
+```bash
+kit remove-audio video.mp4
+kit remove-audio source.mkv --output silent.mkv
+kit remove-audio source.mov --reencode --output silent.mp4
+```
+
 #### Video Compression Examples
 
 The `compress-video` function supports multiple options for controlling output quality and file size:
@@ -367,7 +406,7 @@ kit compress-video video.mp4 -c 28 -o small.mp4
 # Best quality preservation (lower CRF = better quality, larger file)
 kit compress-video video.mp4 -c 18 -o high-quality.mp4
 
-# Custom dimensions
+# Maximum dimensions; smaller sources are never upscaled
 kit compress-video video.mp4 --width 1920
 kit compress-video video.mp4 --width 1280 --preset medium
 
@@ -383,8 +422,9 @@ kit compress-video video.mp4 -p veryslow -c 22
 - `-c, --crf NUM` — Quality level 18-28 (default: 23, lower = better)
 - `-p, --preset PRESET` — Encoding speed (default: slow)
   - Options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
-- `-w, --width NUM` — Scale width in pixels (default: 1280, -1 = no scaling)
+- `-w, --width NUM` — Maximum width in pixels (default: 1280, minimum: 2; odd limits round down; `-1` disables scaling)
 - `-b, --bitrate NUM` — Audio bitrate in k (default: 128)
+- `-f, --force` — Replace an existing output only after encoding succeeds
 - `-v, --verbose` — Show ffmpeg output
 
 **CRF Quality Reference:**
@@ -396,7 +436,7 @@ kit compress-video video.mp4 -p veryslow -c 22
 | 24-28 | Medium | Medium | Web uploads, sharing |
 | 29+ | Low | Small | Quick sharing, storage |
 
-**Note:** Lower CRF = better quality but larger file. The default of 23 is a good balance for most use cases.
+**Note:** Lower CRF = better quality but larger file. CRF does not guarantee a smaller result, so Kit reports the before/after sizes and warns when the output is larger.
 
 #### PDF Processing Examples
 
@@ -445,7 +485,7 @@ cd tests
 ```
 
 **Test Coverage:**
-- **47 tests** across all categories
+- Hermetic and integration coverage across all categories
 - Image processing (resize, optimize, convert, thumbnail, rename)
 - Media processing (compress, remove-audio, convert-to-mp3, yt-download)
 - PDF processing (split, merge, compress, rotate)
