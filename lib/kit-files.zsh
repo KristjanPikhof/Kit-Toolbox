@@ -42,6 +42,20 @@ _kit_is_pdf_file() {
     _kit_file_has_extension "$1" pdf
 }
 
+_kit_prepare_output_dir() {
+    local output_dir="$1"
+    [[ -z "$output_dir" ]] && return 0
+
+    if [[ -e "$output_dir" && ! -d "$output_dir" ]]; then
+        echo "Error: Output directory path is not a directory: $output_dir" >&2
+        return 1
+    fi
+    if [[ ! -d "$output_dir" ]] && ! mkdir -p "$output_dir"; then
+        echo "Error: Cannot create output directory: $output_dir" >&2
+        return 1
+    fi
+}
+
 # Resolve files and directories into a deduplicated file list in the global
 # `reply` array. Explicit files must match the predicate. Directories contribute
 # only matching files and are scanned recursively when requested.
@@ -107,4 +121,3 @@ _kit_collect_files() {
 
     return 0
 }
-
