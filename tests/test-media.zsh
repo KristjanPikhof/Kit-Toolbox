@@ -39,6 +39,7 @@ chmod +x "$TMP/bin/yt-dlp"
 PATH="$TMP/bin:$PATH"
 rehash
 
+source "$ROOT/lib/kit-files.zsh"
 source "$MEDIA"
 _kit_require() { command -v "$1" >/dev/null 2>&1 }
 
@@ -195,6 +196,33 @@ assert_status "compress-video rejects widths below two pixels" "$rc" 2
 out=$(compress-video "$TMP/video.mp4" --bitrate nope --output "$TMP/invalid-bitrate.mp4" 2>&1)
 rc=$?
 assert_status "compress-video validates audio bitrate" "$rc" 2
+
+mkdir -p "$TMP/media-batch/audio" "$TMP/media-batch/video"
+cp "$TMP/voice sample.m4a" "$TMP/media-batch/audio/first.m4a"
+cp "$TMP/voice sample.m4a" "$TMP/media-batch/audio/second.m4a"
+out=$(convert-to-mp3 "$TMP/media-batch/audio" --output-dir "$TMP/media-batch/mp3" 2>&1)
+rc=$?
+assert_status "convert-to-mp3 accepts a directory" "$rc" 0
+assert_file_exists "convert-to-mp3 creates first batch output" "$TMP/media-batch/mp3/first.mp3"
+assert_file_exists "convert-to-mp3 creates second batch output" "$TMP/media-batch/mp3/second.mp3"
+
+cp "$TMP/video.mp4" "$TMP/media-batch/video/first.mp4"
+cp "$TMP/video.mp4" "$TMP/media-batch/video/second.mp4"
+out=$(remove-audio "$TMP/media-batch/video/first.mp4" "$TMP/media-batch/video/second.mp4" --output-dir "$TMP/media-batch/silent" 2>&1)
+rc=$?
+assert_status "remove-audio accepts multiple files" "$rc" 0
+assert_file_exists "remove-audio creates first batch output" "$TMP/media-batch/silent/first_noaudio.mp4"
+assert_file_exists "remove-audio creates second batch output" "$TMP/media-batch/silent/second_noaudio.mp4"
+
+out=$(compress-video "$TMP/media-batch/video" --preset ultrafast --output-dir "$TMP/media-batch/compressed" 2>&1)
+rc=$?
+assert_status "compress-video accepts a directory" "$rc" 0
+assert_file_exists "compress-video creates first batch output" "$TMP/media-batch/compressed/first_compressed.mp4"
+assert_file_exists "compress-video creates second batch output" "$TMP/media-batch/compressed/second_compressed.mp4"
+
+out=$(convert-to-mp3 "$TMP/media-batch/audio" --output "$TMP/not-allowed.mp3" 2>&1)
+rc=$?
+assert_status "batch conversion rejects one output filename" "$rc" 2
 
 print -r -- "input" > "$TMP/race-input.dat"
 race_output="$TMP/race-output.dat"
