@@ -125,7 +125,7 @@ EOF
         return 1
     fi
 
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    _kit_prepare_output_dir "$output_dir" || return 1
     local sanitized_pages="${pages//,/_}"
     sanitized_pages="${sanitized_pages//-/_}"
     local input current_output
@@ -340,7 +340,7 @@ EOF
         return 1
     fi
 
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    _kit_prepare_output_dir "$output_dir" || return 1
     local input current_output
     local -a outputs=()
     local -A seen_outputs=()
@@ -520,7 +520,7 @@ EOF
         rotation_spec="+${degrees}:${pages}"
     fi
 
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    _kit_prepare_output_dir "$output_dir" || return 1
     local input current_output
     local -a outputs=()
     local -A seen_outputs=()
