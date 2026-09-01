@@ -247,28 +247,30 @@ _kit_run_editor() {
     local desc="${KIT_EDITOR_DESCS[$editor_name]}"
 
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        echo "Usage: kit $editor_name <file|folder>"
-        echo "Description: Open file or folder with $desc"
+        echo "Usage: kit $editor_name <path>..."
+        echo "Description: Open one or more files or folders with $desc"
         echo ""
         echo "Examples:"
         echo "  kit $editor_name myfile.md"
+        echo "  kit $editor_name first.md second.md"
         echo "  kit $editor_name ."
         return 0
     fi
 
     if [[ -z "$1" ]]; then
         echo "Error: Missing file or folder path" >&2
-        echo "Usage: kit $editor_name <file|folder>" >&2
+        echo "Usage: kit $editor_name <path>..." >&2
         return 2
     fi
 
-    local target="$1"
-
-    # Check if target exists (skip for current directory)
-    if [[ ! -e "$target" && "$target" != "." ]]; then
-        echo "Error: '$target' does not exist" >&2
-        return 1
-    fi
+    local -a targets=("$@")
+    local target
+    for target in "${targets[@]}"; do
+        if [[ ! -e "$target" && "$target" != "." ]]; then
+            echo "Error: '$target' does not exist" >&2
+            return 1
+        fi
+    done
 
     local -a editor_argv
     editor_argv=("${(@Q)${(z)editor_cmd}}")
@@ -277,7 +279,7 @@ _kit_run_editor() {
         return 1
     fi
 
-    "${editor_argv[@]}" "$target"
+    "${editor_argv[@]}" "${targets[@]}"
 }
 
 _kit_generate_editors() {
