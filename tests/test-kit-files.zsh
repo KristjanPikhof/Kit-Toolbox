@@ -51,6 +51,14 @@ assert_status "rejects an empty matching set" "$rc" 1
 _kit_collect_files _kit_is_image_file false image >/dev/null 2>&1; rc=$?
 assert_status "requires a target" "$rc" 2
 
+_kit_prepare_output_dir "$TMP/new-output"; rc=$?
+assert_status "creates an output directory" "$rc" 0
+[[ -d "$TMP/new-output" ]] && pass "output directory exists" || fail "output directory exists" "directory was not created"
+
+touch "$TMP/not-a-directory"
+_kit_prepare_output_dir "$TMP/not-a-directory" >/dev/null 2>&1; rc=$?
+assert_status "rejects an output path that is a file" "$rc" 1
+
 print -r -- ""
 print -r -- "Passed: $PASS"
 print -r -- "Failed: $FAIL"
