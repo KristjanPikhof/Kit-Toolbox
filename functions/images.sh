@@ -1110,223 +1110,86 @@ EOF
 
 # Quality resize without blurring (adaptive/mesh interpolation)
 img-adaptive-resize() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit img-adaptive-resize <width>x<height> <file>
-Description: Quality resize using mesh interpolation, minimal blur, output has -resized suffix
-Best for: Small size adjustments, magnification, sharp color changes
+Usage: kit img-adaptive-resize <width>x<height> <path>... [options]
+Description: Resize using mesh interpolation for small adjustments and magnification
+Options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned outputs
 Examples:
   kit img-adaptive-resize 800x600 photo.jpg
-  kit img-adaptive-resize 1.5x image.png        # 150% magnification
-Output: Creates photo-resized.jpg (higher quality than standard resize)
+  kit img-adaptive-resize 800x600 a.jpg b.png
+  kit img-adaptive-resize 1.5x ./images --recursive
+Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
-
-    local size="$1"
-    local input="$2"
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
-
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
-    fi
-
-    if magick "$input" -adaptive-resize "$size" "$output" 2>/dev/null; then
-        echo "✅ Created: $output (adaptive resize - high quality)"
-        return 0
-    else
-        echo "Error: Adaptive resize failed for $input" >&2
-        return 1
-    fi
+    _kit_run_image_resize_many adaptive "$@"
 }
 
 # Batch resize multiple images (sequential, safety-first)
 img-batch-resize() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit img-batch-resize <width>x<height> <file1> [file2] [file3] ...
-Description: Batch resize multiple images sequentially, all get -resized suffix
-Features: Safety-first (sequential), progress feedback, error handling
+Usage: kit img-batch-resize <width>x<height> <path>... [options]
+Description: Compatibility alias for img-resize
 Examples:
   kit img-batch-resize 800x600 *.jpg
-  kit img-batch-resize 1024x1024 photo1.jpg photo2.jpg photo3.png
-Output: Creates photo1-resized.jpg, photo2-resized.jpg, photo3-resized.png
+  kit img-batch-resize 1024x1024 ./images --recursive
+Use: kit img-resize -h for all options
 EOF
         return 0
     fi
-
-    local size="$1"
-    shift
-    local files=("$@")
-    local success_count=0
-    local fail_count=0
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    if [[ ${#files[@]} -eq 0 ]]; then
-        echo "Error: No files specified" >&2
-        return 1
-    fi
-
-    echo "Processing ${#files[@]} file(s)..."
-
-    for input in "${files[@]}"; do
-        if [[ ! -f "$input" ]]; then
-            echo "⚠️  Skipping: '$input' (not found)"
-            ((fail_count++))
-            continue
-        fi
-
-        local filename="${input%.*}"
-        local extension="${input##*.}"
-        local output="${filename}-resized.${extension}"
-
-        # Check if output file exists
-        if [[ -f "$output" ]]; then
-            echo "⚠️  Skipping: '$input' (output '$output' already exists)"
-            ((fail_count++))
-            continue
-        fi
-
-        if magick "$input" -resize "$size" "$output" 2>/dev/null; then
-            echo "✅ $input → $output"
-            ((success_count++))
-        else
-            echo "❌ Failed: $input"
-            ((fail_count++))
-        fi
-    done
-
-    echo ""
-    echo "Summary: $success_count succeeded, $fail_count failed"
-    return 0
+    img-resize "$@"
 }
 
 # Only shrink, never enlarge
 img-resize-shrink-only() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit img-resize-shrink-only <width>x<height> <file>
-Description: Only shrink images, never enlarge, output has -resized suffix
-Features: Safe for thumbnails, ignores resize if already smaller
+Usage: kit img-resize-shrink-only <width>x<height> <path>... [options]
+Description: Resize images only when they are larger than the requested size
+Options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned outputs
 Examples:
   kit img-resize-shrink-only 800x600 photo.jpg
-  kit img-resize-shrink-only 1024 large_image.png
-Output: Creates photo-resized.jpg (only if original is larger)
+  kit img-resize-shrink-only 800x600 a.jpg b.png
+  kit img-resize-shrink-only 1024 ./images --recursive
+Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
-
-    local size="$1"
-    local input="$2"
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
-
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
-    fi
-
-    if magick "$input" -resize "${size}>" "$output" 2>/dev/null; then
-        echo "✅ Created: $output (shrink-only resize)"
-        return 0
-    else
-        echo "Error: Shrink-only resize failed for $input" >&2
-        return 1
-    fi
+    _kit_run_image_resize_many shrink "$@"
 }
 
 # Resize with colorspace correction for better quality
 img-resize-colorspace() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" || -z "$3" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit img-resize-colorspace <width>x<height> <file> [-m rgb|lab|luv]
-Description: Resize with colorspace correction for better quality, output has -resized suffix
+Usage: kit img-resize-colorspace <width>x<height> <path>... [options]
+Description: Resize with colorspace correction
 Colorspace options:
-  rgb - Linear RGB (mathematical accuracy, can have color clipping)
-  lab - LAB perceptual (separates intensity from color, avoids clipping) ⭐ RECOMMENDED
-  luv - LUV perceptual (similar to LAB, perceptually uniform)
+  -m, --colorspace rgb  Linear RGB
+  -m, --colorspace lab  LAB perceptual (default)
+  -m, --colorspace luv  LUV perceptual
+Other options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned outputs
 Examples:
-  kit img-resize-colorspace 800x600 photo.jpg -m lab    # LAB (recommended)
-  kit img-resize-colorspace 1024 image.png -m rgb       # Linear RGB
-  kit img-resize-colorspace 500x500 earth.tif -m luv    # LUV colorspace
-Output: Creates photo-resized.jpg (better color accuracy)
+  kit img-resize-colorspace 800x600 photo.jpg
+  kit img-resize-colorspace 800x600 a.jpg b.png -m lab
+  kit img-resize-colorspace 1024 ./images -m rgb --recursive
+Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
-
-    local size="$1"
-    local input="$2"
-    local colorspace="lab"  # Default to LAB (best practice)
-
-    # Parse optional colorspace argument
-    if [[ "$3" == "-m" && -n "$4" ]]; then
-        colorspace="$4"
-    fi
-
-    # Validate colorspace
-    if [[ ! "$colorspace" =~ ^(rgb|lab|luv)$ ]]; then
-        echo "Error: Invalid colorspace '$colorspace'. Use: rgb, lab, or luv" >&2
-        return 1
-    fi
-
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
-
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
-    fi
-
-    echo "Resizing with $colorspace colorspace correction..."
-
-    if magick "$input" \
-        -colorspace "$colorspace" \
-        -filter Lanczos \
-        -resize "$size" \
-        -colorspace sRGB \
-        "$output" 2>/dev/null; then
-        echo "✅ Created: $output (resized with $colorspace colorspace)"
-        return 0
-    else
-        echo "Error: Colorspace resize failed for $input" >&2
-        return 1
-    fi
+    _kit_run_image_resize_many colorspace "$@"
 }
