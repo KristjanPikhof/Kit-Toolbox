@@ -263,7 +263,9 @@ EOF
     if ! _kit_require magick imagemagick; then
         return 1
     fi
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    if [[ "$dry_run" == false ]]; then
+        _kit_prepare_output_dir "$output_dir" || return 1
+    fi
 
     _process_single_resize_width() {
         local input="$1"
@@ -409,7 +411,9 @@ EOF
     if ! _kit_require magick imagemagick; then
         return 1
     fi
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    if [[ "$dry_run" == false ]]; then
+        _kit_prepare_output_dir "$output_dir" || return 1
+    fi
 
     _process_single_resize_percentage() {
         local input="$1"
@@ -547,7 +551,9 @@ EOF
     if ! _kit_require magick imagemagick; then
         return 1
     fi
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    if [[ "$dry_run" == false ]]; then
+        _kit_prepare_output_dir "$output_dir" || return 1
+    fi
 
     _process_single_optimize() {
         local input="$1"
@@ -688,7 +694,9 @@ EOF
     local -a input_files=("${reply[@]}")
 
     _kit_require magick imagemagick || return 1
-    [[ -n "$output_dir" && "$dry_run" == false ]] && mkdir -p "$output_dir" || true
+    if [[ "$dry_run" == false ]]; then
+        _kit_prepare_output_dir "$output_dir" || return 1
+    fi
 
     local file parent filename destination_dir output
     local success=0
@@ -914,7 +922,9 @@ EOF
     if ! _kit_require magick imagemagick; then
         return 1
     fi
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    if [[ "$dry_run" == false ]]; then
+        _kit_prepare_output_dir "$output_dir" || return 1
+    fi
 
     _process_single_resize() {
         local input="$1"
