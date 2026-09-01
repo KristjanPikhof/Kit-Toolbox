@@ -58,6 +58,27 @@ assert_contains "kit -h includes configured shortcut name" "$out" "proj"
 assert_contains "kit -h includes configured shortcut description" "$out" "Fixture project shortcut"
 assert_contains "kit -h includes configured editor name" "$out" "edit"
 assert_contains "kit -h includes configured editor description" "$out" "Fixture fake editor"
+assert_contains "kit -h shows complete PDF signatures" "$out" "--degrees <degrees> <path>... [options]"
+
+out=$(run_zsh '
+  failed=0
+  for module in "$KIT_EXT_DIR"/functions/*.sh; do
+    func_names=$(grep "^# Functions:" "$module" | cut -d: -f2- | tr "," " ")
+    for command in ${=func_names}; do
+      help_output=$(kit "$command" -h 2>&1)
+      if [[ $? -ne 0 || "$help_output" != *"Usage:"* || "$help_output" != *"Description:"* || "$help_output" != *"Example"* ]]; then
+        print -r -- "invalid help: $command"
+        failed=1
+      fi
+    done
+  done
+  exit $failed
+')
+rc=$?
+assert_status "every function help includes usage, description, and examples" "$rc" 0
+if [[ $rc -ne 0 ]]; then
+    print -r -- "$out"
+fi
 
 out=$(KIT_AUTO_SHORTCUTS=false KIT_AUTO_EDITORS=false run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; kit -h'); rc=$?
 assert_status "kit -h with auto config disabled exits 0" "$rc" 0
@@ -116,6 +137,14 @@ out=$(run_zsh '
     CURRENT=3
     words=(kit yt-download -)
     _kit_get_custom_completion yt-download "$CURRENT"
+    print -r -- PDF_ROTATE_OPTIONS
+    CURRENT=3
+    words=(kit pdf-rotate -)
+    _kit_get_custom_completion pdf-rotate "$CURRENT"
+    print -r -- IMAGE_OUTPUT_DIR
+    CURRENT=4
+    words=(kit img-thumbnail --output-dir "")
+    _kit_get_custom_completion img-thumbnail "$CURRENT"
   }
   source_completion
 ')
@@ -138,6 +167,9 @@ assert_contains "completion includes video encoder presets" "$out" "veryslow"
 assert_contains "yt-download option prefix takes priority over quality values" "$out" $'YT_MP3_OPTIONS\nVALUES:options'
 assert_contains "yt-download output value uses file completion" "$out" $'YT_OUTPUT_VALUE\nFILES'
 assert_contains "yt-download leading option prefix uses option completion" "$out" $'YT_LEADING_OPTION\nVALUES:options'
+assert_contains "pdf rotate completion includes batch options" "$out" $'PDF_ROTATE_OPTIONS\nVALUES:options'
+assert_contains "completion includes recursive file processing" "$out" "--recursive"
+assert_contains "image output directory uses directory completion" "$out" $'IMAGE_OUTPUT_DIR\nFILES'
 assert_not_contains "completion helper output has no unexpected missing-file noise" "$out" "no such file"
 assert_not_contains "completion helper output has no command-not-found noise" "$out" "command not found"
 
