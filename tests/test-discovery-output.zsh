@@ -23,6 +23,7 @@ trap cleanup EXIT INT TERM
 mkdir -p "$FIXTURE" "$FIXTURE/lib" "$HOME_DIR" "$TMP/work" "$TMP/project" "$TMP/bin"
 ln -s "$ROOT/loader.zsh" "$FIXTURE/loader.zsh"
 ln -s "$ROOT/lib/kit-core.zsh" "$FIXTURE/lib/kit-core.zsh"
+ln -s "$ROOT/lib/kit-files.zsh" "$FIXTURE/lib/kit-files.zsh"
 ln -s "$ROOT/functions" "$FIXTURE/functions"
 ln -s "$ROOT/completions" "$FIXTURE/completions"
 ln -s "$ROOT/categories.conf" "$FIXTURE/categories.conf"
