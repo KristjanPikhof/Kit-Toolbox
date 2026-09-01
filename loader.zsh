@@ -27,6 +27,13 @@ else
     return 1
 fi
 
+if [[ -f "$KIT_EXT_DIR/lib/kit-files.zsh" ]]; then
+    source "$KIT_EXT_DIR/lib/kit-files.zsh" || return 1
+else
+    echo "Error: Kit file helpers not found at $KIT_EXT_DIR/lib/kit-files.zsh" >&2
+    return 1
+fi
+
 # Read version from VERSION file
 KIT_VERSION="${KIT_VERSION:-unknown}"
 if [[ -f "$KIT_EXT_DIR/VERSION" ]]; then
@@ -467,10 +474,10 @@ kit() {
 
                     # Get description
                     local short_desc=$(declare -f "$func" 2>/dev/null | \
-                        grep -o 'Usage:.*$' | head -1 | sed 's/Usage: kit [^ ]* *//' | sed 's/ *Example.*//' | sed 's/"$//' | cut -c1-45)
+                        grep -o 'Usage:.*$' | head -1 | sed 's/Usage: kit [^ ]* *//' | sed 's/ *Example.*//' | sed 's/"$//')
                     if [[ -z "$short_desc" ]]; then
                         short_desc=$(declare -f "$func" 2>/dev/null | \
-                            grep -o 'Description:.*$' | head -1 | sed 's/Description: //' | cut -c1-45)
+                            grep -o 'Description:.*$' | head -1 | sed 's/Description: //')
                     fi
 
                     # Format function name with alias if present
