@@ -61,6 +61,7 @@ assert_contains "kit -h includes configured editor description" "$out" "Fixture 
 assert_contains "kit -h shows complete PDF signatures" "$out" "--degrees <degrees> <path>... [options]"
 
 out=$(run_zsh '
+  source "$KIT_EXT_DIR/loader.zsh" >/dev/null
   failed=0
   for module in "$KIT_EXT_DIR"/functions/*.sh; do
     func_names=$(grep "^# Functions:" "$module" | cut -d: -f2- | tr "," " ")
