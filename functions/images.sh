@@ -192,6 +192,7 @@ img-resize-width() {
     local force=false
     local dry_run=false
     local recursive=false
+    local output_dir=""
     local width=""
     local -a targets=()
 
@@ -203,6 +204,7 @@ img-resize-width() {
 Usage: kit img-resize-width <width> <path>... [options]
 Description: Simple resize by width only, height auto-calculated, preserves aspect ratio
 Options:
+  -d, --output-dir DIR  Put every output in DIR
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be resized without making changes
   -r, --recursive  Process directories recursively
@@ -226,6 +228,14 @@ EOF
             -r|--recursive)
                 recursive=true
                 shift
+                ;;
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
                 ;;
             -*)
                 echo "Error: Unknown option '$1'" >&2
@@ -253,12 +263,14 @@ EOF
     if ! _kit_require magick imagemagick; then
         return 1
     fi
+    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
 
     _process_single_resize_width() {
         local input="$1"
         local width="$2"
         local force="$3"
         local dry_run="$4"
+        local output_dir="$5"
 
         if ! _is_image_file "$input"; then
             return 0
@@ -267,6 +279,7 @@ EOF
         local filename="${input%.*}"
         local extension="${input##*.}"
         local output="${filename}-resized.${extension}"
+        [[ -n "$output_dir" ]] && output="$output_dir/${input:t:r}-resized.${extension}"
 
         # Prevent double resizing
         if [[ "$filename" == *"-resized" ]]; then
@@ -303,7 +316,7 @@ EOF
     local failed=0
     local file
     for file in "${files[@]}"; do
-        if _process_single_resize_width "$file" "$width" "$force" "$dry_run"; then
+            if _process_single_resize_width "$file" "$width" "$force" "$dry_run" "$output_dir"; then
             ((count++))
         else
             ((failed++))
@@ -319,6 +332,7 @@ img-resize-percentage() {
     local force=false
     local dry_run=false
     local recursive=false
+    local output_dir=""
     local percentage=""
     local -a targets=()
 
@@ -331,6 +345,7 @@ Usage: kit img-resize-percentage <percentage> <path>... [options]
 Description: Resize image by percentage using Lanczos filter for high quality
 Features: Uses Lanczos interpolation - ideal for upscaling, reduces blur
 Options:
+  -d, --output-dir DIR  Put every output in DIR
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be resized without making changes
   -r, --recursive  Process directories recursively
@@ -354,6 +369,14 @@ EOF
             -r|--recursive)
                 recursive=true
                 shift
+                ;;
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
                 ;;
             -*)
                 echo "Error: Unknown option '$1'" >&2
@@ -386,12 +409,14 @@ EOF
     if ! _kit_require magick imagemagick; then
         return 1
     fi
+    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
 
     _process_single_resize_percentage() {
         local input="$1"
         local percentage="$2"
         local force="$3"
         local dry_run="$4"
+        local output_dir="$5"
 
         if ! _is_image_file "$input"; then
             return 0
@@ -400,6 +425,7 @@ EOF
         local filename="${input%.*}"
         local extension="${input##*.}"
         local output="${filename}-resized.${extension}"
+        [[ -n "$output_dir" ]] && output="$output_dir/${input:t:r}-resized.${extension}"
 
         # Prevent double resizing
         if [[ "$filename" == *"-resized" ]]; then
@@ -436,7 +462,7 @@ EOF
     local failed=0
     local file
     for file in "${files[@]}"; do
-        if _process_single_resize_percentage "$file" "$percentage" "$force" "$dry_run"; then
+        if _process_single_resize_percentage "$file" "$percentage" "$force" "$dry_run" "$output_dir"; then
             ((count++))
         else
             ((failed++))
@@ -457,6 +483,7 @@ img-optimize() {
     local force=false
     local dry_run=false
     local recursive=false
+    local output_dir=""
     local -a targets=()
 
     # Parse arguments
@@ -469,6 +496,7 @@ Description: Optimize image size without changing its format
 Effect: Strips EXIF/metadata and recompresses the image at quality 85%
 Note: Keeps the original format (PNG stays PNG, JPG stays JPG)
 Options:
+  -d, --output-dir DIR  Put every output in DIR
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be optimized without making changes
   -r, --recursive  Process directories recursively
@@ -494,6 +522,14 @@ EOF
                 recursive=true
                 shift
                 ;;
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
+                ;;
             -*)
                 echo "Error: Unknown option '$1'" >&2
                 return 2
@@ -511,11 +547,13 @@ EOF
     if ! _kit_require magick imagemagick; then
         return 1
     fi
+    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
 
     _process_single_optimize() {
         local input="$1"
         local force="$2"
         local dry_run="$3"
+        local output_dir="$4"
 
         if ! _is_image_file "$input"; then
             return 0
@@ -524,6 +562,7 @@ EOF
         local filename="${input%.*}"
         local extension="${input##*.}"
         local output="${filename}-optimized.${extension}"
+        [[ -n "$output_dir" ]] && output="$output_dir/${input:t:r}-optimized.${extension}"
 
         # Prevent double optimization
         if [[ "$filename" == *"-optimized" ]]; then
@@ -560,7 +599,7 @@ EOF
     local failed=0
     local file
     for file in "${files[@]}"; do
-        if _process_single_optimize "$file" "$force" "$dry_run"; then
+        if _process_single_optimize "$file" "$force" "$dry_run" "$output_dir"; then
             ((count++))
         else
             ((failed++))
