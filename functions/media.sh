@@ -366,18 +366,21 @@ EOF
     fi
 
     _kit_require ffmpeg || return 1
+    _kit_prepare_output_dir "$output_dir" || return 1
 
-    local input input_stem input_extension current_output
+    local input input_stem input_extension output_extension current_output
     local -a outputs=()
     local -A seen_outputs=()
     for input in "${inputs[@]}"; do
         input_stem=$(_kit_media_stem "$input")
         input_extension="${input:e}"
         [[ -z "$input_extension" ]] && input_extension="mkv"
+        output_extension="$input_extension"
+        [[ "$reencode" == true ]] && output_extension="mp4"
         if [[ -n "$output" ]]; then
             current_output="$output"
         elif [[ -n "$output_dir" ]]; then
-            current_output="$output_dir/${input:t:r}_noaudio.$([[ "$reencode" == true ]] && print mp4 || print "$input_extension")"
+            current_output="$output_dir/${input:t:r}_noaudio.${output_extension}"
         elif [[ "$reencode" == true ]]; then
             current_output="${input_stem}_noaudio.mp4"
         else
@@ -398,7 +401,6 @@ EOF
     for ((index=1; index<=${#inputs[@]}; index++)); do
         input="${inputs[$index]}"
         current_output="${outputs[$index]}"
-        [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
         local -a ffmpeg_args=(-map 0 -map -0:a -map_metadata 0 -map_chapters 0 -c copy)
         [[ "$reencode" == true ]] && ffmpeg_args+=(-c:v libx264 -crf 23 -preset fast)
         case "${current_output:e}" in
@@ -576,7 +578,7 @@ EOF
     fi
     ffmpeg_args+=(-id3v2_version 3)
 
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    _kit_prepare_output_dir "$output_dir" || return 1
     local input current_output
     local -a outputs=()
     local -A seen_outputs=()
@@ -779,7 +781,7 @@ EOF
         ffmpeg_args+=(-vf "scale='trunc(min(iw,${width})/2)*2':-2")
     fi
 
-    [[ -n "$output_dir" ]] && mkdir -p "$output_dir" || true
+    _kit_prepare_output_dir "$output_dir" || return 1
     local input current_output
     local -a outputs=()
     local -A seen_outputs=()
