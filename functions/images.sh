@@ -9,17 +9,17 @@
 img-rename() {
     local dry_run=false
     local separator="_"
-    local target=""
     local recursive=false
     local sequential_name=""
     local start_num=1
+    local -a targets=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-rename <file|directory> [options]
+Usage: kit img-rename <path>... [options]
 Description: Sanitize image filenames by replacing spaces/special chars with underscores/hyphens
           Or rename all images sequentially (e.g., image_1.jpg, image_2.jpg)
 Options:
@@ -30,8 +30,8 @@ Options:
   --start <number>       Starting number for sequential mode (default: 1)
 Examples:
   kit img-rename "photo 1.jpg"              # Sanitize: photo_1.jpg
+  kit img-rename "photo 1.jpg" "photo 2.jpg" # Sanitize two files
   kit img-rename "VR (Quest/similar).jpg"   # Sanitize: VR_Quest_similar.jpg
-  kit img-rename "  my image.png "          # Sanitize: my_image.png (trims spaces)
   kit img-rename . --sep "-"                # Sanitize all images in dir, use hyphens
   kit img-rename . --name "photo"           # Sequential: photo_1.jpg, photo_2.png
   kit img-rename . --name "img" --start 10  # Sequential: img_10.jpg, img_11.png
@@ -59,342 +59,132 @@ EOF
                 shift
                 ;;
             --name)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: --name requires a base name" >&2
+                    return 2
+                fi
                 sequential_name="$2"
                 shift 2
                 ;;
             --start)
-                if [[ "$2" =~ ^[0-9]+$ ]]; then
+                if [[ $# -ge 2 && "$2" =~ ^[0-9]+$ ]]; then
                     start_num="$2"
                 else
-                    echo "Error: Start number must be a positive integer" >&2
+                    echo "Error: --start requires a non-negative integer" >&2
                     return 2
                 fi
                 shift 2
                 ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
+                ;;
             *)
-                if [[ -z "$target" ]]; then
-                    target="$1"
-                fi
+                targets+=("$1")
                 shift
                 ;;
         esac
     done
 
-    # Input validation
-    if [[ -z "$target" ]]; then
-        echo "Error: Missing target file or directory" >&2
-        return 2
-    fi
-
-    # Sequential mode only works with directories
-    if [[ -n "$sequential_name" && ! -d "$target" ]]; then
-        echo "Error: Sequential mode (--name) requires a directory target" >&2
-        return 2
-    fi
-
-    # Sanitize filename to prevent injection attacks
-    # Check for shell metacharacters that could be dangerous
-    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
-       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
-       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
-        echo "Error: Target contains invalid characters" >&2
-        return 2
-    fi
-
-    # Check for path traversal
-    if [[ "$target" == *"../"* ]] || [[ "$target" == *"/.."* ]]; then
-        echo "Error: Path contains traversal sequences" >&2
-        return 2
-    fi
-
-    # Validate sequential_name doesn't have invalid characters
     if [[ -n "$sequential_name" ]]; then
-        if [[ "$sequential_name" == *"|"* ]] || [[ "$sequential_name" == *"&"* ]] || \
-           [[ "$sequential_name" == *'$'* ]] || [[ "$sequential_name" == *";"* ]] || \
-           [[ "$sequential_name" == *"<"* ]] || [[ "$sequential_name" == *">"* ]] || \
-           [[ "$sequential_name" == *"/"* ]] || [[ "$sequential_name" == *"\\"* ]]; then
+        if [[ "$sequential_name" == *"/"* || "$sequential_name" == *"\\"* || "$sequential_name" == *".."* ]]; then
             echo "Error: Base name contains invalid characters" >&2
             return 2
         fi
-        # Also check for path traversal in base name
-        if [[ "$sequential_name" == *".."* ]]; then
-            echo "Error: Base name cannot contain '..'" >&2
-            return 2
-        fi
     fi
 
-    # Supported image extensions
-    local -a extensions=(jpg jpeg png gif webp bmp tiff tif heic heif avif svg ico)
-    local -a extensions_upper=(JPG JPEG PNG GIF WEBP BMP TIFF TIF HEIC HEIF AVIF SVG ICO)
+    _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    local -a files=("${reply[@]}")
 
-    # Function to generate new filename
-    _generate_new_name() {
+    _kit_image_sanitized_path() {
         local old_name="$1"
         local dirname="${old_name%/*}"
         local basename="${old_name##*/}"
         local filename="${basename%.*}"
         local extension="${basename##*.}"
-        extension="${extension% }"
-        extension="${extension# }"
 
-        # Check if it's an image file (by extension)
-        local is_image=false
-        for ext in "${extensions[@]}" "${extensions_upper[@]}"; do
-            if [[ "${extension:l}" == "${ext:l}" ]]; then
-                is_image=true
-                break
-            fi
+        local trimmed="${filename## }"
+        trimmed="${trimmed%% }"
+        local character
+        for character in '(' ')' '[' ']' '{' '}' '\\' '/' ':' ';' ',' '+' '=' '@' '#' '%' '^' '~' '!' "'" '"' '`' '|' '&' '$' '*' '?' '<' '>'; do
+            trimmed="${trimmed//$character/$separator}"
         done
-
-        if [[ "$is_image" == false ]]; then
-            echo ""
-            return
-        fi
-
-        # Trim leading and trailing spaces
-        local trimmed="${filename## }"      # Remove leading spaces
-        trimmed="${trimmed%% }"              # Remove trailing spaces
-
-        # Replace problematic special characters with separator
-        # These cause issues in shells or filesystems
-        trimmed="${trimmed//\(/$separator}"   # (
-        trimmed="${trimmed//\)/$separator}"   # )
-        trimmed="${trimmed//\[/$separator}"   # [
-        trimmed="${trimmed//\]/$separator}"   # ]
-        trimmed="${trimmed//\{/$separator}"   # {
-        trimmed="${trimmed//\}/$separator}"   # }
-        trimmed="${trimmed//\\/$separator}"   # backslash
-        trimmed="${trimmed//\//$separator}"   # forward slash (dangerous!)
-        trimmed="${trimmed//:/$separator}"    # : (problematic on macOS/Windows)
-        trimmed="${trimmed//;/$separator}"    # ;
-        trimmed="${trimmed//,/$separator}"    # comma (optional)
-        trimmed="${trimmed//+/$separator}"    # +
-        trimmed="${trimmed//=/$separator}"    # =
-        trimmed="${trimmed//@/$separator}"    # @
-        trimmed="${trimmed//#/$separator}"    # #
-        trimmed="${trimmed//%/$separator}"    # %
-        trimmed="${trimmed//^/$separator}"    # ^
-        trimmed="${trimmed//~/$separator}"    # ~
-        trimmed="${trimmed//\!/$separator}"   # !
-        trimmed="${trimmed//\'/$separator}"   # '
-        trimmed="${trimmed//\"/$separator}"   # "
-        trimmed="${trimmed//\`/$separator}"   # backtick
-        trimmed="${trimmed//|/$separator}"    # |
-        trimmed="${trimmed//&/$separator}"    # &
-        trimmed="${trimmed//\$/$separator}"   # $
-        trimmed="${trimmed//\*/$separator}"   # *
-        trimmed="${trimmed//\?/$separator}"   # ? (escaped for zsh/bash glob)
-        trimmed="${trimmed//</$separator}"    # <
-        trimmed="${trimmed//>/$separator}"    # >
-
-        # Replace spaces with separator (after other chars to handle properly)
         local new_name="${trimmed// /$separator}"
 
-        # Replace multiple consecutive separators with single one
         while [[ "$new_name" == *"${separator}${separator}"* ]]; do
             new_name="${new_name//${separator}${separator}/$separator}"
         done
-
-        # Remove separator from start/end if present
         new_name="${new_name#${separator}}"
         new_name="${new_name%${separator}}"
 
-        # If nothing changed, return empty
         if [[ "$new_name" == "$filename" ]]; then
-            echo ""
-            return
+            return 1
         fi
 
-        # Construct full new path
         if [[ "$dirname" == "$basename" ]]; then
-            echo "${new_name}.${extension}"
+            print -r -- "${new_name}.${extension}"
         else
-            echo "${dirname}/${new_name}.${extension}"
+            print -r -- "${dirname}/${new_name}.${extension}"
         fi
     }
 
-    # Process single file
-    if [[ -f "$target" ]]; then
-        local new_name
-        new_name="$(_generate_new_name "$target")"
-
-        if [[ -z "$new_name" ]]; then
-            if [[ "$target" != *" "* ]]; then
-                echo "No changes needed: $target (already sanitized)"
-            else
-                echo "Skipped: $target (not an image file)"
-            fi
-            return 0
-        fi
-
-        # Check if target already exists
-        if [[ -e "$new_name" ]]; then
-            echo "Error: Cannot rename '$target' to '$new_name' - target already exists" >&2
-            return 1
-        fi
-
-        if [[ "$dry_run" == true ]]; then
-            echo "Would rename: $target -> $new_name"
-        else
-            if mv "$target" "$new_name"; then
-                echo "Renamed: $target -> $new_name"
-            else
-                echo "Error: Failed to rename '$target'" >&2
-                return 1
-            fi
-        fi
-        return 0
-    fi
-
-    # Process directory
-    if [[ -d "$target" ]]; then
-        # Sequential mode: rename all images to basename_N.ext
+    local -a outputs=()
+    local -A planned_outputs=()
+    local file output parent basename extension
+    local counter=$start_num
+    for file in "${files[@]}"; do
         if [[ -n "$sequential_name" ]]; then
-            local count=0
-            local failed=0
-            local counter=$start_num
-
-            # Build find command based on recursive flag
-            local find_pattern="$target/*"
-            if [[ "$recursive" == true ]]; then
-                find_pattern="$target/**/*"
-            fi
-
-            # Use setopt for nullglob in zsh
-            setopt local_options nullglob 2>/dev/null || true
-
-            # Collect and sort files for consistent ordering
-            local -a files=()
-            for file in $~find_pattern; do
-                [[ -f "$file" ]] || continue
-
-                # Check if it's an image file
-                local ext="${file##*.}"
-                local is_image=false
-                for e in "${extensions[@]}" "${extensions_upper[@]}"; do
-                    if [[ "${ext:l}" == "${e:l}" ]]; then
-                        is_image=true
-                        break
-                    fi
-                done
-
-                [[ "$is_image" == true ]] && files+=("$file")
-            done
-
-            # Sort files for consistent ordering
-            files=("${(@o)files}")
-
-            for file in "${files[@]}"; do
-                local ext="${file##*.}"
-                local new_name="${target}/${sequential_name}_${counter}.${ext}"
-
-                # Check if target already exists
-                if [[ -e "$new_name" && "$new_name" != "$file" ]]; then
-                    echo "Warning: '$file' -> '$new_name' - target exists, skipping" >&2
-                    ((failed++))
-                    ((counter++))
-                    continue
-                fi
-
-                # Skip if no change needed
-                if [[ "$new_name" == "$file" ]]; then
-                    ((counter++))
-                    continue
-                fi
-
-                if [[ "$dry_run" == true ]]; then
-                    echo "Would rename: $file -> $new_name"
-                    ((count++))
-                else
-                    if mv "$file" "$new_name"; then
-                        echo "Renamed: $file -> $new_name"
-                        ((count++))
-                    else
-                        echo "Error: Failed to rename '$file'" >&2
-                        ((failed++))
-                    fi
-                fi
-                ((counter++))
-            done
-
-            echo ""
-            if [[ "$dry_run" == true ]]; then
-                echo "Would rename $count file(s)"
-            else
-                echo "Renamed $count file(s) to ${sequential_name}_N format"
-            fi
-            if [[ $failed -gt 0 ]]; then
-                echo "Failed: $failed file(s)" >&2
-                return 1
-            fi
-            return 0
-        fi
-
-        # Sanitize mode (default)
-        local count=0
-        local skipped=0
-        local failed=0
-
-        # Build find command based on recursive flag
-        local find_pattern="$target/*"
-        if [[ "$recursive" == true ]]; then
-            find_pattern="$target/**/*"
-        fi
-
-        # Use setopt for nullglob in zsh
-        setopt local_options nullglob 2>/dev/null || true
-
-        for file in $~find_pattern; do
-            [[ -f "$file" ]] || continue
-
-            local new_name
-            new_name="$(_generate_new_name "$file")"
-
-            if [[ -z "$new_name" ]]; then
-                ((skipped++))
-                continue
-            fi
-
-            # Check if target already exists
-            if [[ -e "$new_name" ]]; then
-                echo "Warning: '$file' -> '$new_name' - target exists, skipping" >&2
-                ((failed++))
-                continue
-            fi
-
-            if [[ "$dry_run" == true ]]; then
-                echo "Would rename: $file -> $new_name"
-                ((count++))
-            else
-                if mv "$file" "$new_name"; then
-                    echo "Renamed: $file -> $new_name"
-                    ((count++))
-                else
-                    echo "Error: Failed to rename '$file'" >&2
-                    ((failed++))
-                fi
-            fi
-        done
-
-        echo ""
-        if [[ "$dry_run" == true ]]; then
-            echo "Would rename $count file(s)"
+            parent="${file:h}"
+            basename="${file:t}"
+            extension="${basename##*.}"
+            output="${parent}/${sequential_name}_${counter}.${extension}"
+            ((counter++))
         else
-            echo "Renamed $count file(s)"
+            output="$(_kit_image_sanitized_path "$file")" || output=""
         fi
-        if [[ $skipped -gt 0 ]]; then
-            echo "Skipped $skipped file(s) (no changes needed or not images)"
-        fi
-        if [[ $failed -gt 0 ]]; then
-            echo "Failed: $failed file(s)" >&2
+        outputs+=("$output")
+
+        [[ -z "$output" || "$output" == "$file" ]] && continue
+        if [[ -n "${planned_outputs[${output:A}]:-}" ]]; then
+            echo "Error: More than one input would be renamed to '$output'" >&2
             return 1
         fi
-        return 0
-    fi
+        planned_outputs[${output:A}]=1
+        if [[ -e "$output" ]]; then
+            echo "Error: Rename destination already exists: $output" >&2
+            return 1
+        fi
+    done
 
-    # Target doesn't exist
-    echo "Error: Target '$target' does not exist" >&2
-    return 1
+    local renamed=0
+    local unchanged=0
+    local failed=0
+    local index
+    for ((index=1; index<=${#files[@]}; index++)); do
+        file="${files[$index]}"
+        output="${outputs[$index]}"
+        if [[ -z "$output" || "$output" == "$file" ]]; then
+            ((unchanged++))
+            continue
+        fi
+        if [[ "$dry_run" == true ]]; then
+            echo "Would rename: $file -> $output"
+            ((renamed++))
+        elif mv "$file" "$output"; then
+            echo "Renamed: $file -> $output"
+            ((renamed++))
+        else
+            echo "Error: Failed to rename '$file'" >&2
+            ((failed++))
+        fi
+    done
+
+    if [[ "$dry_run" == true ]]; then
+        echo "Would rename $renamed file(s); $unchanged unchanged"
+    else
+        echo "Renamed $renamed file(s); $unchanged unchanged"
+    fi
+    [[ $failed -eq 0 ]]
 }
 
 # Image Resize by Width (height auto-calculated to preserve aspect ratio)
@@ -403,14 +193,14 @@ img-resize-width() {
     local dry_run=false
     local recursive=false
     local width=""
-    local target=""
+    local -a targets=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-resize-width <width> <file|directory> [options]
+Usage: kit img-resize-width <width> <path>... [options]
 Description: Simple resize by width only, height auto-calculated, preserves aspect ratio
 Options:
   -f, --force      Overwrite output file if it exists
@@ -418,6 +208,7 @@ Options:
   -r, --recursive  Process directories recursively
 Examples:
   kit img-resize-width 800 photo.jpg
+  kit img-resize-width 800 photo.jpg cover.png
   kit img-resize-width 1920 . --recursive
   kit img-resize-width 800 . --dry-run
 Output: Creates photo-resized.jpg
@@ -436,11 +227,15 @@ EOF
                 recursive=true
                 shift
                 ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
+                ;;
             *)
                 if [[ -z "$width" ]]; then
                     width="$1"
-                elif [[ -z "$target" ]]; then
-                    target="$1"
+                else
+                    targets+=("$1")
                 fi
                 shift
                 ;;
@@ -452,24 +247,8 @@ EOF
         return 2
     fi
 
-    if [[ -z "$target" ]]; then
-        echo "Error: Missing target file or directory" >&2
-        return 2
-    fi
-
-    # Sanitize filename to prevent injection attacks
-    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
-    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
-       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
-       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
-        echo "Error: Target contains invalid characters" >&2
-        return 1
-    fi
-
-    if [[ ! -e "$target" ]]; then
-        echo "Error: Target '$target' does not exist" >&2
-        return 1
-    fi
+    _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    local -a files=("${reply[@]}")
 
     if ! _kit_require magick imagemagick; then
         return 1
@@ -520,43 +299,19 @@ EOF
         fi
     }
 
-    if [[ -f "$target" ]]; then
-        _process_single_resize_width "$target" "$width" "$force" "$dry_run"
-        return $?
-    fi
-
-    if [[ -d "$target" ]]; then
-        local count=0
-        local failed=0
-        
-        # Build find command pattern
-        local find_pattern="$target/*"
-        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
-
-        # Use setopt for nullglob in zsh
-        setopt local_options nullglob 2>/dev/null || true
-
-        for file in $~find_pattern; do
-            [[ -f "$file" ]] || continue
-            if ! _is_image_file "$file"; then
-                continue
-            fi
-            if _process_single_resize_width "$file" "$width" "$force" "$dry_run"; then
-                ((count++))
-            else
-                ((failed++))
-            fi
-        done
-
-        echo ""
-        if [[ "$dry_run" == true ]]; then
-            echo "Would resize $count file(s)"
+    local count=0
+    local failed=0
+    local file
+    for file in "${files[@]}"; do
+        if _process_single_resize_width "$file" "$width" "$force" "$dry_run"; then
+            ((count++))
         else
-            echo "Resized $count file(s)"
+            ((failed++))
         fi
-        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
-        return 0
-    fi
+    done
+
+    [[ "$dry_run" == true ]] && echo "Would resize $count file(s)" || echo "Resized $count file(s)"
+    [[ $failed -eq 0 ]]
 }
 
 # Image Resize by Percentage (using Lanczos interpolation for quality - ideal for upscaling)
@@ -565,14 +320,14 @@ img-resize-percentage() {
     local dry_run=false
     local recursive=false
     local percentage=""
-    local target=""
+    local -a targets=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-resize-percentage <percentage> <file|directory> [options]
+Usage: kit img-resize-percentage <percentage> <path>... [options]
 Description: Resize image by percentage using Lanczos filter for high quality
 Features: Uses Lanczos interpolation - ideal for upscaling, reduces blur
 Options:
@@ -581,6 +336,7 @@ Options:
   -r, --recursive  Process directories recursively
 Examples:
   kit img-resize-percentage 200 photo.jpg    # Double size (upscale)
+  kit img-resize-percentage 50 a.jpg b.png   # Resize two files
   kit img-resize-percentage 50 . --recursive # Half size in current dir
   kit img-resize-percentage 150 . --dry-run
 Output: Creates photo-resized.jpg
@@ -599,11 +355,15 @@ EOF
                 recursive=true
                 shift
                 ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
+                ;;
             *)
                 if [[ -z "$percentage" ]]; then
                     percentage="$1"
-                elif [[ -z "$target" ]]; then
-                    target="$1"
+                else
+                    targets+=("$1")
                 fi
                 shift
                 ;;
@@ -615,28 +375,13 @@ EOF
         return 2
     fi
 
-    if [[ -z "$target" ]]; then
-        echo "Error: Missing target file or directory" >&2
+    if ! [[ "$percentage" =~ ^[0-9]+$ ]]; then
+        echo "Error: Percentage must be a number (e.g., 50, 150, 200)" >&2
         return 2
     fi
 
-    if ! [[ "$percentage" =~ ^[0-9]+$ ]]; then
-        echo "Error: Percentage must be a number (e.g., 50, 150, 200)" >&2
-        return 1
-    fi
-
-    # Sanitize filename to prevent injection attacks
-    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
-       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
-       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
-        echo "Error: Target contains invalid characters" >&2
-        return 1
-    fi
-
-    if [[ ! -e "$target" ]]; then
-        echo "Error: Target '$target' does not exist" >&2
-        return 1
-    fi
+    _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    local -a files=("${reply[@]}")
 
     if ! _kit_require magick imagemagick; then
         return 1
@@ -687,59 +432,24 @@ EOF
         fi
     }
 
-    if [[ -f "$target" ]]; then
-        _process_single_resize_percentage "$target" "$percentage" "$force" "$dry_run"
-        return $?
-    fi
-
-    if [[ -d "$target" ]]; then
-        local count=0
-        local failed=0
-        
-        # Build find command pattern
-        local find_pattern="$target/*"
-        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
-
-        # Use setopt for nullglob in zsh
-        setopt local_options nullglob 2>/dev/null || true
-
-        for file in $~find_pattern; do
-            [[ -f "$file" ]] || continue
-            if ! _is_image_file "$file"; then
-                continue
-            fi
-            if _process_single_resize_percentage "$file" "$percentage" "$force" "$dry_run"; then
-                ((count++))
-            else
-                ((failed++))
-            fi
-        done
-
-        echo ""
-        if [[ "$dry_run" == true ]]; then
-            echo "Would resize $count file(s)"
+    local count=0
+    local failed=0
+    local file
+    for file in "${files[@]}"; do
+        if _process_single_resize_percentage "$file" "$percentage" "$force" "$dry_run"; then
+            ((count++))
         else
-            echo "Resized $count file(s)"
+            ((failed++))
         fi
-        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
-        return 0
-    fi
+    done
+
+    [[ "$dry_run" == true ]] && echo "Would resize $count file(s)" || echo "Resized $count file(s)"
+    [[ $failed -eq 0 ]]
 }
 
 # Helper to check if a file is a supported image
 _is_image_file() {
-    local file="$1"
-    local extension="${file##*.}"
-    extension="${extension% }"
-    extension="${extension# }"
-
-    local -a extensions=(jpg jpeg png gif webp bmp tiff tif heic heif avif svg ico)
-    for ext in "${extensions[@]}"; do
-        if [[ "${extension:l}" == "${ext:l}" ]]; then
-            return 0
-        fi
-    done
-    return 1
+    _kit_is_image_file "$1"
 }
 
 # Image Optimization (strips metadata and compresses)
@@ -747,14 +457,14 @@ img-optimize() {
     local force=false
     local dry_run=false
     local recursive=false
-    local target=""
+    local -a targets=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-optimize <file|directory> [options]
+Usage: kit img-optimize <path>... [options]
 Description: Optimize image size without changing its format
 Effect: Strips EXIF/metadata and recompresses the image at quality 85%
 Note: Keeps the original format (PNG stays PNG, JPG stays JPG)
@@ -764,6 +474,7 @@ Options:
   -r, --recursive  Process directories recursively
 Examples:
   kit img-optimize photo.jpg
+  kit img-optimize photo.jpg logo.png
   kit img-optimize logo.png          # Creates logo-optimized.png
   kit img-optimize . --recursive --dry-run
   kit img-optimize image.png --force
@@ -783,33 +494,19 @@ EOF
                 recursive=true
                 shift
                 ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
+                ;;
             *)
-                if [[ -z "$target" ]]; then
-                    target="$1"
-                fi
+                targets+=("$1")
                 shift
                 ;;
         esac
     done
 
-    if [[ -z "$target" ]]; then
-        echo "Error: Missing target file or directory" >&2
-        return 2
-    fi
-
-    # Sanitize filename to prevent injection attacks
-    # Note: Using fixed character class - backslash-escape inside [] has inconsistent behavior
-    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
-       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
-       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
-        echo "Error: Target contains invalid characters" >&2
-        return 1
-    fi
-
-    if [[ ! -e "$target" ]]; then
-        echo "Error: Target '$target' does not exist" >&2
-        return 1
-    fi
+    _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    local -a files=("${reply[@]}")
 
     if ! _kit_require magick imagemagick; then
         return 1
@@ -859,74 +556,75 @@ EOF
         fi
     }
 
-    if [[ -f "$target" ]]; then
-        _process_single_optimize "$target" "$force" "$dry_run"
-        return $?
-    fi
-
-    if [[ -d "$target" ]]; then
-        local count=0
-        local failed=0
-        
-        # Build find command pattern
-        local find_pattern="$target/*"
-        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
-
-        # Use setopt for nullglob in zsh
-        setopt local_options nullglob 2>/dev/null || true
-
-        for file in $~find_pattern; do
-            [[ -f "$file" ]] || continue
-            if ! _is_image_file "$file"; then
-                continue
-            fi
-            if _process_single_optimize "$file" "$force" "$dry_run"; then
-                ((count++))
-            else
-                ((failed++))
-            fi
-        done
-
-        echo ""
-        if [[ "$dry_run" == true ]]; then
-            echo "Would optimize $count file(s)"
+    local count=0
+    local failed=0
+    local file
+    for file in "${files[@]}"; do
+        if _process_single_optimize "$file" "$force" "$dry_run"; then
+            ((count++))
         else
-            echo "Optimized $count file(s)"
+            ((failed++))
         fi
-        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
-        return 0
-    fi
+    done
+
+    [[ "$dry_run" == true ]] && echo "Would optimize $count file(s)" || echo "Optimized $count file(s)"
+    [[ $failed -eq 0 ]]
 }
 
 # Unified Image Format Conversion
 img-convert() {
-    local target="."
     local from_format=""
     local to_format=""
+    local recursive=false
+    local force=false
+    local dry_run=false
+    local output_dir=""
+    local -a targets=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-convert <from_format> <to_format> [directory]
-Description: Convert all images of one format to another format
+Usage: kit img-convert <from_format> <to_format> [path]... [options]
+Description: Convert one or more images to another format
 Supported formats: png, jpg, jpeg, webp, heic, avif, bmp, tiff, gif, pdf
+Options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned conversions
 Examples:
-  kit img-convert png jpg         # Convert all PNG to JPG in current dir
-  kit img-convert heic webp ./old # Convert all HEIC to WebP in ./old
-  kit img-convert jpg png .       # Convert all JPG to PNG in current dir
-Output: Creates <directory>/converted/ directory with converted files
+  kit img-convert png jpg photo.png
+  kit img-convert png jpg a.png b.png
+  kit img-convert heic webp ./old --recursive
+  kit img-convert jpg png . --output-dir ./converted
+Output: Uses a converted/ directory beside each input unless --output-dir is set
 EOF
                 return 0
+                ;;
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
+                ;;
+            -r|--recursive) recursive=true; shift ;;
+            -f|--force) force=true; shift ;;
+            -n|--dry-run) dry_run=true; shift ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
                 ;;
             *)
                 if [[ -z "$from_format" ]]; then
                     from_format="$1"
                 elif [[ -z "$to_format" ]]; then
                     to_format="$1"
-                elif [[ -z "$target" || "$target" == "." ]]; then
-                    target="$1"
+                else
+                    targets+=("$1")
                 fi
                 shift
                 ;;
@@ -938,183 +636,163 @@ EOF
         return 2
     fi
 
-    if [[ ! -d "$target" ]]; then
-        echo "Error: Directory '$target' does not exist" >&2
-        return 1
+    local -a supported_formats=(png jpg jpeg webp heic avif bmp tiff gif pdf)
+    if (( ! supported_formats[(Ie)${from_format:l}] || ! supported_formats[(Ie)${to_format:l}] )); then
+        echo "Error: Unsupported format. Use: ${supported_formats[*]}" >&2
+        return 2
     fi
 
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
+    [[ ${#targets[@]} -eq 0 ]] && targets=(.)
 
-    # Find all matching files (case-insensitive)
-    setopt local_options nullglob 2>/dev/null || true
-    local -a input_files=()
-    
-    # Check for formats in target directory
-    for file in "$target"/*.{"$from_format","${from_format:u}","${from_format:l}"}; do
-        [[ -f "$file" ]] && input_files+=("$file")
+    _kit_matches_conversion_source() { _kit_file_has_extension "$1" "$from_format"; }
+    _kit_collect_files _kit_matches_conversion_source "$recursive" ".${from_format:l} image" "${targets[@]}" || return $?
+    local -a input_files=("${reply[@]}")
+
+    _kit_require magick imagemagick || return 1
+    [[ -n "$output_dir" && "$dry_run" == false ]] && mkdir -p "$output_dir" || true
+
+    local file parent filename destination_dir output
+    local success=0
+    local failed=0
+    local -A outputs=()
+    local -a planned_outputs=()
+    for file in "${input_files[@]}"; do
+        parent="${file:h}"
+        filename="${file:t:r}"
+        destination_dir="${output_dir:-$parent/converted}"
+        output="$destination_dir/$filename.${to_format:l}"
+        if [[ -n "${outputs[${output:A}]:-}" ]]; then
+            echo "Error: Multiple inputs would create '$output'" >&2
+            return 1
+        fi
+        outputs[${output:A}]=1
+        if [[ -e "$output" && "$force" != true ]]; then
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
+        planned_outputs+=("$output")
     done
 
-    if [[ ${#input_files[@]} -eq 0 ]]; then
-        echo "Error: No .$from_format files found in '$target'" >&2
-        return 1
-    fi
-
-    echo "Converting ${#input_files[@]} file(s) from $from_format to $to_format in '$target'..."
-
-    # Create output directory relative to target
-    local out_dir="${target}/converted"
-    mkdir -p "$out_dir" || {
-        echo "Error: Cannot create '$out_dir' directory" >&2
-        return 1
-    }
-
-    # Convert files
-    if magick mogrify -path "$out_dir" -format "$to_format" -quality 90 -auto-orient "${input_files[@]}" 2>/dev/null; then
-        local count=$(ls -1 "$out_dir"/*."$to_format" 2>/dev/null | wc -l | tr -d ' ')
-        echo "✅ Converted $count file(s) to $to_format in $out_dir"
-        return 0
-    else
-        echo "Error: Conversion failed" >&2
-        return 1
-    fi
+    local index
+    for ((index=1; index<=${#input_files[@]}; index++)); do
+        file="${input_files[$index]}"
+        output="${planned_outputs[$index]}"
+        if [[ "$dry_run" == true ]]; then
+            echo "Would convert: $file -> $output"
+            ((success++))
+            continue
+        fi
+        mkdir -p "${output:h}" || { echo "Error: Cannot create '${output:h}'" >&2; ((failed++)); continue; }
+        if magick "$file" -quality 90 -auto-orient "$output" 2>/dev/null; then
+            echo "Created: $output"
+            ((success++))
+        else
+            echo "Error: Conversion failed for '$file'" >&2
+            ((failed++))
+        fi
+    done
+    echo "Converted $success file(s); $failed failed"
+    [[ $failed -eq 0 ]]
 }
 
 # Optimize images to WebP format with maximum quality and compression
 img-optimize-to-webp() {
-    local target="."
+    local recursive=false
+    local force=false
+    local dry_run=false
+    local output_dir=""
+    local -a targets=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-optimize-to-webp [file|directory]
-Description: Convert a supported image or directory of images to optimized WebP format
+Usage: kit img-optimize-to-webp [path]... [options]
+Description: Convert one or more supported images to optimized WebP
 Features: Maximum quality (90), best compression (method=6, pass=10), sharp-yuv enabled
 Supported input: PNG, JPG, JPEG, HEIC
-Example: 
+Options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned conversions
+Examples:
   kit img-optimize-to-webp photo.jpg   # Creates ./optimized/photo.webp
+  kit img-optimize-to-webp a.jpg b.png
   kit img-optimize-to-webp             # Current directory
-  kit img-optimize-to-webp ./pics      # Process ./pics
-Output: Creates <target>/optimized/ directory with WebP files
+  kit img-optimize-to-webp ./pics --recursive
+Output: Uses an optimized/ directory beside each input unless --output-dir is set
 EOF
                 return 0
                 ;;
-            *)
-                if [[ -z "$target" || "$target" == "." ]]; then
-                    target="$1"
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
                 fi
+                output_dir="$2"
+                shift 2
+                ;;
+            -r|--recursive) recursive=true; shift ;;
+            -f|--force) force=true; shift ;;
+            -n|--dry-run) dry_run=true; shift ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
+                ;;
+            *)
+                targets+=("$1")
                 shift
                 ;;
         esac
     done
 
-    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
-       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
-       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
-        echo "Error: Target contains invalid characters" >&2
-        return 1
-    fi
+    [[ ${#targets[@]} -eq 0 ]] && targets=(.)
+    _kit_collect_files _kit_is_webp_source_file "$recursive" image "${targets[@]}" || return $?
+    local -a files=("${reply[@]}")
+    _kit_require magick imagemagick || return 1
 
-    if [[ ! -e "$target" ]]; then
-        echo "Error: Target '$target' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    _is_webp_source_file() {
-        local file="$1"
-        local extension="${file##*.}"
-        extension="${extension% }"
-        extension="${extension# }"
-
-        local -a extensions=(png jpg jpeg heic)
-        for ext in "${extensions[@]}"; do
-            if [[ "${extension:l}" == "${ext:l}" ]]; then
-                return 0
-            fi
-        done
-        return 1
-    }
-
-    _process_single_optimize_to_webp() {
-        local input="$1"
-
-        if ! _is_webp_source_file "$input"; then
-            echo "Error: Unsupported input file '$input' (supported: PNG, JPG, JPEG, HEIC)" >&2
+    local file destination_dir output
+    local -a outputs=()
+    local -A seen_outputs=()
+    for file in "${files[@]}"; do
+        destination_dir="${output_dir:-${file:h}/optimized}"
+        output="$destination_dir/${file:t:r}.webp"
+        if [[ -n "${seen_outputs[${output:A}]:-}" ]]; then
+            echo "Error: Multiple inputs would create '$output'" >&2
             return 1
         fi
-
-        local parent_dir="${input%/*}"
-        local basename="${input##*/}"
-        local filename="${basename%.*}"
-        [[ "$parent_dir" == "$input" ]] && parent_dir="."
-
-        local out_dir="${parent_dir}/optimized"
-        local output="${out_dir}/${filename}.webp"
-
-        mkdir -p "$out_dir" || {
-            echo "Error: Cannot create '$out_dir' directory" >&2
-            return 1
-        }
-
-        if magick "$input" -quality 90 -define webp:method=$WEBP_METHOD -define webp:pass=$WEBP_PASS -define webp:use-sharp-yuv=1 "$output" 2>/dev/null; then
-            echo "✅ Created: $output"
-            return 0
-        else
-            echo "Error: Optimization failed for $input" >&2
+        seen_outputs[${output:A}]=1
+        if [[ -e "$output" && "$force" != true ]]; then
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
             return 1
         fi
-    }
-
-    # Optimize to WebP with maximum quality settings
-    local WEBP_METHOD=6  # Compression method: 0=fast, 6=best compression (slower)
-    local WEBP_PASS=10   # Number of compression passes: higher = better compression (slower)
-
-    if [[ -f "$target" ]]; then
-        _process_single_optimize_to_webp "$target"
-        return $?
-    fi
-
-    if [[ ! -d "$target" ]]; then
-        echo "Error: Target '$target' must be a file or directory" >&2
-        return 1
-    fi
-
-    # Find all supported image files
-    setopt local_options nullglob 2>/dev/null || true
-    local -a input_files=()
-    for file in "$target"/*.{png,jpg,jpeg,HEIC,heic,PNG,JPG,JPEG}; do
-        [[ -f "$file" ]] && input_files+=("$file")
+        outputs+=("$output")
     done
 
-    if [[ ${#input_files[@]} -eq 0 ]]; then
-        echo "Error: No supported image files found in '$target' (PNG, JPG, HEIC)" >&2
-        return 1
-    fi
-
-    echo "Optimizing ${#input_files[@]} image(s) to WebP in '$target'..."
-
-    # Create output directory relative to target
-    local out_dir="${target}/optimized"
-    mkdir -p "$out_dir" || {
-        echo "Error: Cannot create '$out_dir' directory" >&2
-        return 1
-    }
-
-    if magick mogrify -path "$out_dir" -format webp -quality 90 -define webp:method=$WEBP_METHOD -define webp:pass=$WEBP_PASS -define webp:use-sharp-yuv=1 "${input_files[@]}" 2>/dev/null; then
-        local count=$(ls -1 "$out_dir"/*.webp 2>/dev/null | wc -l | tr -d ' ')
-        echo "✅ Optimized $count file(s) to WebP in $out_dir"
-        return 0
-    else
-        echo "Error: Optimization failed" >&2
-        return 1
-    fi
+    local success=0
+    local failed=0
+    local index
+    for ((index=1; index<=${#files[@]}; index++)); do
+        file="${files[$index]}"
+        output="${outputs[$index]}"
+        if [[ "$dry_run" == true ]]; then
+            echo "Would optimize: $file -> $output"
+            ((success++))
+            continue
+        fi
+        mkdir -p "${output:h}" || { echo "Error: Cannot create '${output:h}'" >&2; ((failed++)); continue; }
+        if magick "$file" -quality 90 -define webp:method=6 -define webp:pass=10 -define webp:use-sharp-yuv=1 "$output" 2>/dev/null; then
+            echo "Created: $output"
+            ((success++))
+        else
+            echo "Error: Optimization failed for '$file'" >&2
+            ((failed++))
+        fi
+    done
+    echo "Optimized $success file(s); $failed failed"
+    [[ $failed -eq 0 ]]
 }
 
 # ============================================================================
@@ -1127,14 +805,14 @@ img-resize() {
     local dry_run=false
     local recursive=false
     local size=""
-    local target=""
+    local -a targets=()
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit img-resize <width>x<height> <file|directory> [options]
+Usage: kit img-resize <width>x<height> <path>... [options]
 Description: Resize image preserving aspect ratio, output has -resized suffix
 Options:
   -f, --force      Overwrite output file if it exists
@@ -1142,6 +820,7 @@ Options:
   -r, --recursive  Process directories recursively
 Examples:
   kit img-resize 800x600 photo.jpg        # Fit within 800x600
+  kit img-resize 800x600 photo.jpg cover.png
   kit img-resize 1024 . --recursive       # Width 1024 in current dir
   kit img-resize 1920x1080 . --dry-run
 Output: Creates photo-resized.jpg
@@ -1160,11 +839,15 @@ EOF
                 recursive=true
                 shift
                 ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
+                ;;
             *)
                 if [[ -z "$size" ]]; then
                     size="$1"
-                elif [[ -z "$target" ]]; then
-                    target="$1"
+                else
+                    targets+=("$1")
                 fi
                 shift
                 ;;
@@ -1176,23 +859,8 @@ EOF
         return 2
     fi
 
-    if [[ -z "$target" ]]; then
-        echo "Error: Missing target file or directory" >&2
-        return 2
-    fi
-
-    # Sanitize filename to prevent injection attacks
-    if [[ "$target" == *"|"* ]] || [[ "$target" == *"&"* ]] || \
-       [[ "$target" == *'$'* ]] || [[ "$target" == *";"* ]] || \
-       [[ "$target" == *"<"* ]] || [[ "$target" == *">"* ]]; then
-        echo "Error: Target contains invalid characters" >&2
-        return 1
-    fi
-
-    if [[ ! -e "$target" ]]; then
-        echo "Error: Target '$target' does not exist" >&2
-        return 1
-    fi
+    _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    local -a files=("${reply[@]}")
 
     if ! _kit_require magick imagemagick; then
         return 1
@@ -1243,178 +911,201 @@ EOF
         fi
     }
 
-    if [[ -f "$target" ]]; then
-        _process_single_resize "$target" "$size" "$force" "$dry_run"
-        return $?
-    fi
-
-    if [[ -d "$target" ]]; then
-        local count=0
-        local failed=0
-        
-        # Build find command pattern
-        local find_pattern="$target/*"
-        [[ "$recursive" == true ]] && find_pattern="$target/**/*"
-
-        # Use setopt for nullglob in zsh
-        setopt local_options nullglob 2>/dev/null || true
-
-        for file in $~find_pattern; do
-            [[ -f "$file" ]] || continue
-            if ! _is_image_file "$file"; then
-                continue
-            fi
-            if _process_single_resize "$file" "$size" "$force" "$dry_run"; then
-                ((count++))
-            else
-                ((failed++))
-            fi
-        done
-
-        echo ""
-        if [[ "$dry_run" == true ]]; then
-            echo "Would resize $count file(s)"
+    local count=0
+    local failed=0
+    local file
+    for file in "${files[@]}"; do
+        if _process_single_resize "$file" "$size" "$force" "$dry_run"; then
+            ((count++))
         else
-            echo "Resized $count file(s)"
+            ((failed++))
         fi
-        [[ $failed -gt 0 ]] && echo "Failed/Skipped: $failed file(s)" >&2
-        return 0
+    done
+
+    [[ "$dry_run" == true ]] && echo "Would resize $count file(s)" || echo "Resized $count file(s)"
+    [[ $failed -eq 0 ]]
+}
+
+_kit_run_image_resize_many() {
+    local mode="$1"
+    shift
+
+    local size=""
+    local recursive=false
+    local force=false
+    local dry_run=false
+    local output_dir=""
+    local colorspace="lab"
+    local -a targets=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -r|--recursive) recursive=true; shift ;;
+            -f|--force) force=true; shift ;;
+            -n|--dry-run) dry_run=true; shift ;;
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
+                ;;
+            -m|--colorspace)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires rgb, lab, or luv" >&2
+                    return 2
+                fi
+                colorspace="$2"
+                shift 2
+                ;;
+            -*)
+                echo "Error: Unknown option '$1'" >&2
+                return 2
+                ;;
+            *)
+                if [[ -z "$size" ]]; then
+                    size="$1"
+                else
+                    targets+=("$1")
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$size" ]]; then
+        echo "Error: Missing size" >&2
+        return 2
     fi
+    if [[ "$mode" == colorspace && ! "$colorspace" =~ ^(rgb|lab|luv)$ ]]; then
+        echo "Error: Invalid colorspace '$colorspace'. Use: rgb, lab, or luv" >&2
+        return 2
+    fi
+
+    _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    local -a files=("${reply[@]}")
+    _kit_require magick imagemagick || return 1
+
+    local file output
+    local -a outputs=()
+    local -A seen_outputs=()
+    for file in "${files[@]}"; do
+        if [[ -n "$output_dir" ]]; then
+            output="$output_dir/${file:t:r}-resized.${file:e}"
+        else
+            output="${file:r}-resized.${file:e}"
+        fi
+        if [[ -n "${seen_outputs[${output:A}]:-}" ]]; then
+            echo "Error: Multiple inputs would create '$output'" >&2
+            return 1
+        fi
+        seen_outputs[${output:A}]=1
+        if [[ -e "$output" && "$force" != true ]]; then
+            echo "Error: Output file '$output' already exists. Use --force to overwrite." >&2
+            return 1
+        fi
+        outputs+=("$output")
+    done
+
+    local success=0
+    local failed=0
+    local index
+    for ((index=1; index<=${#files[@]}; index++)); do
+        file="${files[$index]}"
+        output="${outputs[$index]}"
+        if [[ "$dry_run" == true ]]; then
+            echo "Would resize: $file -> $output"
+            ((success++))
+            continue
+        fi
+        mkdir -p "${output:h}" || { echo "Error: Cannot create '${output:h}'" >&2; ((failed++)); continue; }
+        case "$mode" in
+            thumbnail) magick "$file" -thumbnail "$size" -strip "$output" 2>/dev/null ;;
+            exact) magick "$file" -resize "${size}!" "$output" 2>/dev/null ;;
+            fill) magick "$file" -resize "${size}^" -gravity center -extent "$size" "$output" 2>/dev/null ;;
+            adaptive) magick "$file" -adaptive-resize "$size" "$output" 2>/dev/null ;;
+            shrink) magick "$file" -resize "${size}>" "$output" 2>/dev/null ;;
+            colorspace) magick "$file" -colorspace "$colorspace" -filter Lanczos -resize "$size" -colorspace sRGB "$output" 2>/dev/null ;;
+        esac
+        if [[ $? -eq 0 ]]; then
+            echo "Created: $output"
+            ((success++))
+        else
+            rm -f "$output"
+            echo "Error: Resize failed for '$file'" >&2
+            ((failed++))
+        fi
+    done
+
+    echo "Resized $success file(s); $failed failed"
+    [[ $failed -eq 0 ]]
 }
 
 # Fast thumbnail generation with profile stripping
 img-thumbnail() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit img-thumbnail <width>x<height> <file>
-Description: Fast thumbnail generation, strips profiles, output has -resized suffix
-Features: Optimized for speed, profile stripping, great for batch operations
+Usage: kit img-thumbnail <width>x<height> <path>... [options]
+Description: Create fast thumbnails and strip image profiles
+Options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned outputs
 Examples:
   kit img-thumbnail 200x200 photo.jpg
-  kit img-thumbnail 300x300 large_image.png
-Output: Creates photo-resized.jpg (thumbnail)
+  kit img-thumbnail 200x200 a.jpg b.png
+  kit img-thumbnail 300x300 ./images --recursive
+Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
-
-    local size="$1"
-    local input="$2"
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
-
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
-    fi
-
-    if magick "$input" -thumbnail "$size" -strip "$output" 2>/dev/null; then
-        echo "✅ Created thumbnail: $output"
-        return 0
-    else
-        echo "Error: Thumbnail generation failed for $input" >&2
-        return 1
-    fi
+    _kit_run_image_resize_many thumbnail "$@"
 }
 
 # Force exact dimensions (ignore aspect ratio)
 img-resize-exact() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit img-resize-exact <width>x<height> <file>
-Description: Force exact dimensions, ignores aspect ratio, output has -resized suffix
-⚠️  WARNING: This will distort the image to exact size
+Usage: kit img-resize-exact <width>x<height> <path>... [options]
+Description: Force exact dimensions, which may distort the image
+Options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned outputs
 Examples:
-  kit img-resize-exact 800x600 photo.jpg      # Force 800x600 (may distort)
-  kit img-resize-exact 1024x768 image.png
-Output: Creates photo-resized.jpg
+  kit img-resize-exact 800x600 photo.jpg
+  kit img-resize-exact 800x600 a.jpg b.png
+  kit img-resize-exact 1024x768 ./images --recursive
+Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
-
-    local size="$1"
-    local input="$2"
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
-
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
-    fi
-
-    if magick "$input" -resize "${size}!" "$output" 2>/dev/null; then
-        echo "✅ Created: $output (forced to exact dimensions)"
-        return 0
-    else
-        echo "Error: Exact resize failed for $input" >&2
-        return 1
-    fi
+    _kit_run_image_resize_many exact "$@"
 }
 
 # Resize to fill space and crop excess
 img-resize-fill() {
-    if [[ "$1" == "-h" || -z "$1" || -z "$2" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit img-resize-fill <width>x<height> <file>
-Description: Resize to fill area, crop excess, centered, output has -resized suffix
-Features: Fills entire space, crops excess intelligently, center-aligned
+Usage: kit img-resize-fill <width>x<height> <path>... [options]
+Description: Resize to fill an area, center the image, and crop excess
+Options:
+  -d, --output-dir DIR  Put every output in DIR
+  -r, --recursive       Process directories recursively
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned outputs
 Examples:
   kit img-resize-fill 800x600 photo.jpg
-  kit img-resize-fill 1024x1024 image.png
-Output: Creates photo-resized.jpg (fills entire 800x600 space)
+  kit img-resize-fill 800x600 a.jpg b.png
+  kit img-resize-fill 1024x1024 ./images --recursive
+Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
-
-    local size="$1"
-    local input="$2"
-    local filename="${input%.*}"
-    local extension="${input##*.}"
-    local output="${filename}-resized.${extension}"
-
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
-        return 1
-    fi
-
-    if ! _kit_require magick imagemagick; then
-        return 1
-    fi
-
-    # Check if output file exists
-    if [[ -f "$output" ]]; then
-        echo "Error: Output file '$output' already exists. Please remove it or choose a different location." >&2
-        return 1
-    fi
-
-    if magick "$input" -resize "${size}^" -gravity center -extent "$size" "$output" 2>/dev/null; then
-        echo "✅ Created: $output (filled and cropped to $size)"
-        return 0
-    else
-        echo "Error: Fill resize failed for $input" >&2
-        return 1
-    fi
+    _kit_run_image_resize_many fill "$@"
 }
 
 # Quality resize without blurring (adaptive/mesh interpolation)
