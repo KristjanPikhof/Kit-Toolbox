@@ -56,9 +56,10 @@ _kit_prepare_output_dir() {
     fi
 }
 
-# Resolve files and directories into a deduplicated file list in the global
-# `reply` array. Explicit files must match the predicate. Directories contribute
-# only matching files and are scanned recursively when requested.
+# Resolve files and directories into deduplicated global arrays:
+# `reply` contains each file, `reply_origins` contains the directory argument it
+# came from, and `reply_relatives` contains its path below that directory.
+# Explicit files have an empty origin and use their filename as the relative path.
 _kit_collect_files() {
     emulate -L zsh
     setopt local_options no_unset
@@ -68,7 +69,10 @@ _kit_collect_files() {
     local label="$3"
     shift 3
 
+    typeset -ga reply reply_origins reply_relatives
     reply=()
+    reply_origins=()
+    reply_relatives=()
     if [[ $# -eq 0 ]]; then
         echo "Error: At least one file or directory is required" >&2
         return 2
@@ -76,7 +80,7 @@ _kit_collect_files() {
 
     local -A seen=()
     local -a candidates=()
-    local target candidate canonical
+    local target candidate canonical origin relative
     local invalid=false
 
     for target in "$@"; do
@@ -87,7 +91,10 @@ _kit_collect_files() {
                 continue
             fi
             candidates=("$target")
+            origin=""
         elif [[ -d "$target" ]]; then
+            origin="${target%/}"
+            [[ -z "$origin" ]] && origin="/"
             if [[ "$recursive" == true ]]; then
                 candidates=("$target"/**/*(ND.))
             else
@@ -105,12 +112,21 @@ _kit_collect_files() {
             if [[ -z "${seen[$canonical]:-}" ]]; then
                 seen[$canonical]=1
                 reply+=("$candidate")
+                reply_origins+=("$origin")
+                if [[ -n "$origin" ]]; then
+                    relative="${candidate#${origin%/}/}"
+                else
+                    relative="${candidate:t}"
+                fi
+                reply_relatives+=("$relative")
             fi
         done
     done
 
     if [[ "$invalid" == true ]]; then
         reply=()
+        reply_origins=()
+        reply_relatives=()
         return 1
     fi
 
@@ -120,4 +136,50 @@ _kit_collect_files() {
     fi
 
     return 0
+}
+
+# Remove files found inside an automatically generated result folder. Explicitly
+# targeting that result folder still works because it becomes the input origin.
+_kit_exclude_collected_subdir() {
+    local excluded="$1"
+    local -a kept_files=() kept_origins=() kept_relatives=()
+    local index relative
+
+    for ((index=1; index<=${#reply[@]}; index++)); do
+        relative="${reply_relatives[$index]}"
+        if [[ -n "${reply_origins[$index]}" && ( "$relative" == "$excluded" || "$relative" == "$excluded"/* ) ]]; then
+            continue
+        fi
+        kept_files+=("${reply[$index]}")
+        kept_origins+=("${reply_origins[$index]}")
+        kept_relatives+=("$relative")
+    done
+
+    reply=("${kept_files[@]}")
+    reply_origins=("${kept_origins[@]}")
+    reply_relatives=("${kept_relatives[@]}")
+}
+
+# Set REPLY to a predictable output path. Files passed directly get a sibling
+# output. Files discovered through a directory go into its result folder while
+# preserving subdirectories.
+_kit_default_output_path() {
+    local input="$1"
+    local origin="$2"
+    local relative="$3"
+    local result_folder="$4"
+    local suffix="$5"
+    local extension="$6"
+    local output_dir base relative_dir
+
+    base="${relative:t:r}"
+    if [[ -n "$origin" ]]; then
+        relative_dir="${relative:h}"
+        output_dir="$origin/$result_folder"
+        [[ "$relative_dir" != "." ]] && output_dir="$output_dir/$relative_dir"
+    else
+        output_dir="${input:h}"
+    fi
+
+    REPLY="$output_dir/${base}${suffix}.${extension}"
 }
