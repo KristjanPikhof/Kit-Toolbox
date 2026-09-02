@@ -183,3 +183,22 @@ _kit_default_output_path() {
 
     REPLY="$output_dir/${base}${suffix}.${extension}"
 }
+
+_kit_default_output_for_collected() {
+    local input="$1"
+    local result_folder="$2"
+    local suffix="$3"
+    local extension="$4"
+    local index
+
+    for ((index=1; index<=${#reply[@]}; index++)); do
+        if [[ "${reply[$index]:A}" == "${input:A}" ]]; then
+            _kit_default_output_path "$input" "${reply_origins[$index]}" "${reply_relatives[$index]}" \
+                "$result_folder" "$suffix" "$extension"
+            return 0
+        fi
+    done
+
+    echo "Error: Cannot determine the source of '$input'" >&2
+    return 1
+}
