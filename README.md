@@ -130,7 +130,7 @@ kit yt-download mp3 "https://youtube.com/watch?v=..."
 
 ### File and directory inputs
 
-File processing commands use the same input rules. Pass one file, several files, a directory, or a mixture of files and directories. A directory contributes matching files from its top level. Add `--recursive` to include subdirectories.
+File processing commands use the same input rules. Pass one file, several files, a directory, or a mixture of files and directories. A directory processes matching files from its top level. Use `--recursive` only when you also want files from folders inside it.
 
 ```bash
 kit img-resize 800x600 photo.jpg
@@ -139,7 +139,7 @@ kit img-resize 800x600 ./images
 kit img-resize 800x600 ./images extra.png --recursive
 ```
 
-Commands ignore unrelated files found inside a directory, but reject an explicitly supplied file of the wrong type. Use `--output FILE` only when a command resolves one input. Use `--output-dir DIR` for batch output when the command supports a custom destination.
+Commands ignore unrelated files found inside a directory, but reject an explicitly supplied file of the wrong type. For transforms that create new files, a direct file gets a sibling result and a directory gets a named result folder inside it. For example, `kit remove-audio videos` creates `videos/removed-audio/`. `--output` and `--output-dir` are optional overrides.
 
 ## Available Functions
 
@@ -379,8 +379,11 @@ kit convert-to-mp3 recording.m4a
 # Small voice recording: 48kbps mono at 24kHz
 kit convert-to-mp3 recording.m4a --preset speech
 
-# Convert every supported file in a directory
-kit convert-to-mp3 ./recordings --recursive --output-dir ./mp3
+# Convert every supported file in a directory to recordings/converted-to-mp3/
+kit convert-to-mp3 recordings
+
+# Also include recordings stored in folders inside recordings/
+kit convert-to-mp3 recordings --recursive
 
 # Exact bitrate and custom output
 kit convert-to-mp3 music.m4a --bitrate 128 --output music.mp3
@@ -406,10 +409,13 @@ kit yt-download mp4 "https://youtube.com/watch?v=..."
 ```bash
 kit remove-audio video.mp4
 kit remove-audio intro.mp4 outro.mov
-kit remove-audio ./videos --recursive --output-dir ./silent
+kit remove-audio videos
+kit remove-audio videos --recursive
 kit remove-audio source.mkv --output silent.mkv
 kit remove-audio source.mov --reencode --output silent.mp4
 ```
+
+The simple forms choose the destination for you. A direct file such as `video.mp4` creates `video-remove-audio.mp4` beside it. A folder such as `videos` creates `videos/removed-audio/`. `--recursive` means Kit also looks in folders inside `videos`; it is not needed for files directly in `videos`.
 
 #### Video Compression Examples
 
@@ -418,7 +424,7 @@ The `compress-video` function supports multiple options for controlling output q
 ```bash
 # Basic compression (default settings)
 kit compress-video video.mp4
-kit compress-video ./videos --recursive --output-dir ./compressed
+kit compress-video videos
 
 # High compression for uploads (higher CRF = smaller file, lower quality)
 kit compress-video video.mp4 -c 28 -o small.mp4
