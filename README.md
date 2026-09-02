@@ -443,10 +443,10 @@ kit compress-video video.mp4 -p ultrafast -c 26
 kit compress-video video.mp4 -p veryslow -c 22
 ```
 
-**Options:**
-- `-o, --output FILE` — Output filename (default: input_compressed.mp4)
-- `-d, --output-dir DIR` — Output directory for batch processing
-- `-r, --recursive` — Include matching files from subdirectories
+**Optional controls:**
+- `-o, --output FILE` — Custom output name for one input
+- `-d, --output-dir DIR` — Custom result folder
+- `-r, --recursive` — Also include matching files in folders inside the selected folder
 - `-c, --crf NUM` — Quality level 18-28 (default: 23, lower = better)
 - `-p, --preset PRESET` — Encoding speed (default: slow)
   - Options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
@@ -479,7 +479,7 @@ kit pdf-burst document.pdf -o "report_%d.pdf" # Custom filename pattern
 # Split pages from a PDF
 kit pdf-split --pages "1-10" document.pdf
 kit pdf-split --pages "1,3,5,7" report.pdf invoice.pdf
-kit pdf-split --pages "50-100" ./books --output-dir ./extracts
+kit pdf-split --pages "50-100" books
 
 # Merge multiple PDFs
 kit pdf-merge part1.pdf part2.pdf part3.pdf
@@ -489,13 +489,13 @@ kit pdf-merge ./chapters -o combined.pdf
 # Compress a PDF
 kit pdf-compress large_scan.pdf
 kit pdf-compress report.pdf invoice.pdf
-kit pdf-compress ./documents --recursive --output-dir ./compressed
+kit pdf-compress documents
 kit pdf-compress report.pdf -o report_small.pdf
 
 # Rotate PDF pages
 kit pdf-rotate --degrees 90 scan.pdf
 kit pdf-rotate --degrees 180 --pages "1,3" report.pdf invoice.pdf
-kit pdf-rotate --degrees 270 ./documents --recursive --output-dir ./rotated
+kit pdf-rotate --degrees 270 documents
 ```
 
 ## Development & Extension
