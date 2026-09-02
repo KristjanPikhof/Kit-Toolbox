@@ -204,17 +204,17 @@ img-resize-width() {
                 cat << EOF
 Usage: kit img-resize-width <width> <path>... [options]
 Description: Simple resize by width only, height auto-calculated, preserves aspect ratio
-Options:
-  -d, --output-dir DIR  Put every output in DIR
+Default output: A file gets a sibling result; a folder uses <folder>/resized/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be resized without making changes
-  -r, --recursive  Process directories recursively
+  -r, --recursive  Also include matching files in subfolders
 Examples:
   kit img-resize-width 800 photo.jpg
   kit img-resize-width 800 photo.jpg cover.png
   kit img-resize-width 1920 . --recursive
   kit img-resize-width 800 . --dry-run
-Output: Creates photo-resized.jpg
 EOF
                 return 0
                 ;;
@@ -350,17 +350,17 @@ img-resize-percentage() {
 Usage: kit img-resize-percentage <percentage> <path>... [options]
 Description: Resize image by percentage using Lanczos filter for high quality
 Features: Uses Lanczos interpolation - ideal for upscaling, reduces blur
-Options:
-  -d, --output-dir DIR  Put every output in DIR
+Default output: A file gets a sibling result; a folder uses <folder>/resized/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be resized without making changes
-  -r, --recursive  Process directories recursively
+  -r, --recursive  Also include matching files in subfolders
 Examples:
   kit img-resize-percentage 200 photo.jpg    # Double size (upscale)
   kit img-resize-percentage 50 a.jpg b.png   # Resize two files
   kit img-resize-percentage 50 . --recursive # Half size in current dir
   kit img-resize-percentage 150 . --dry-run
-Output: Creates photo-resized.jpg
 EOF
                 return 0
                 ;;
@@ -507,18 +507,18 @@ Usage: kit img-optimize <path>... [options]
 Description: Optimize image size without changing its format
 Effect: Strips EXIF/metadata and recompresses the image at quality 85%
 Note: Keeps the original format (PNG stays PNG, JPG stays JPG)
-Options:
-  -d, --output-dir DIR  Put every output in DIR
+Default output: A file gets a sibling result; a folder uses <folder>/optimized/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be optimized without making changes
-  -r, --recursive  Process directories recursively
+  -r, --recursive  Also include matching files in subfolders
 Examples:
   kit img-optimize photo.jpg
   kit img-optimize photo.jpg logo.png
   kit img-optimize logo.png          # Creates logo-optimized.png
   kit img-optimize . --recursive --dry-run
   kit img-optimize image.png --force
-Output: Creates photo-optimized.jpg
 EOF
                 return 0
                 ;;
@@ -646,9 +646,10 @@ img-convert() {
 Usage: kit img-convert <from_format> <to_format> [path]... [options]
 Description: Convert one or more images to another format
 Supported formats: png, jpg, jpeg, webp, heic, avif, bmp, tiff, gif, pdf
-Options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+Default output: A file gets a sibling result; a folder uses <folder>/converted/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned conversions
 Examples:
@@ -656,7 +657,6 @@ Examples:
   kit img-convert png jpg a.png b.png
   kit img-convert heic webp ./old --recursive
   kit img-convert jpg png . --output-dir ./converted
-Output: Uses a converted/ directory beside each input unless --output-dir is set
 EOF
                 return 0
                 ;;
@@ -775,9 +775,10 @@ Usage: kit img-optimize-to-webp [path]... [options]
 Description: Convert one or more supported images to optimized WebP
 Features: Maximum quality (90), best compression (method=6, pass=10), sharp-yuv enabled
 Supported input: PNG, JPG, JPEG, HEIC
-Options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+Default output: A file gets a sibling WebP; a folder uses <folder>/optimized/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned conversions
 Examples:
@@ -785,7 +786,6 @@ Examples:
   kit img-optimize-to-webp a.jpg b.png
   kit img-optimize-to-webp             # Current directory
   kit img-optimize-to-webp ./pics --recursive
-Output: Uses an optimized/ directory beside each input unless --output-dir is set
 EOF
                 return 0
                 ;;
@@ -883,17 +883,17 @@ img-resize() {
                 cat << EOF
 Usage: kit img-resize <width>x<height> <path>... [options]
 Description: Resize image preserving aspect ratio, output has -resized suffix
-Options:
-  -d, --output-dir DIR  Put every output in DIR
+Default output: A file gets a sibling result; a folder uses <folder>/resized/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
   -f, --force      Overwrite output file if it exists
   -n, --dry-run    Show what would be resized without making changes
-  -r, --recursive  Process directories recursively
+  -r, --recursive  Also include matching files in subfolders
 Examples:
   kit img-resize 800x600 photo.jpg        # Fit within 800x600
   kit img-resize 800x600 photo.jpg cover.png
   kit img-resize 1024 . --recursive       # Width 1024 in current dir
   kit img-resize 1920x1080 . --dry-run
-Output: Creates photo-resized.jpg
 EOF
                 return 0
                 ;;
@@ -1147,16 +1147,16 @@ img-thumbnail() {
         cat << EOF
 Usage: kit img-thumbnail <width>x<height> <path>... [options]
 Description: Create fast thumbnails and strip image profiles
-Options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+Default output: A file gets a sibling result; a folder uses <folder>/thumbnails/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned outputs
 Examples:
   kit img-thumbnail 200x200 photo.jpg
   kit img-thumbnail 200x200 a.jpg b.png
   kit img-thumbnail 300x300 ./images --recursive
-Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
@@ -1169,16 +1169,16 @@ img-resize-exact() {
         cat << EOF
 Usage: kit img-resize-exact <width>x<height> <path>... [options]
 Description: Force exact dimensions, which may distort the image
-Options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+Default output: A file gets a sibling result; a folder uses <folder>/resized-exact/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned outputs
 Examples:
   kit img-resize-exact 800x600 photo.jpg
   kit img-resize-exact 800x600 a.jpg b.png
   kit img-resize-exact 1024x768 ./images --recursive
-Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
@@ -1191,16 +1191,16 @@ img-resize-fill() {
         cat << EOF
 Usage: kit img-resize-fill <width>x<height> <path>... [options]
 Description: Resize to fill an area, center the image, and crop excess
-Options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+Default output: A file gets a sibling result; a folder uses <folder>/resized-fill/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned outputs
 Examples:
   kit img-resize-fill 800x600 photo.jpg
   kit img-resize-fill 800x600 a.jpg b.png
   kit img-resize-fill 1024x1024 ./images --recursive
-Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
@@ -1213,16 +1213,16 @@ img-adaptive-resize() {
         cat << EOF
 Usage: kit img-adaptive-resize <width>x<height> <path>... [options]
 Description: Resize using mesh interpolation for small adjustments and magnification
-Options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+Default output: A file gets a sibling result; a folder uses <folder>/adaptive-resized/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned outputs
 Examples:
   kit img-adaptive-resize 800x600 photo.jpg
   kit img-adaptive-resize 800x600 a.jpg b.png
   kit img-adaptive-resize 1.5x ./images --recursive
-Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
@@ -1251,16 +1251,16 @@ img-resize-shrink-only() {
         cat << EOF
 Usage: kit img-resize-shrink-only <width>x<height> <path>... [options]
 Description: Resize images only when they are larger than the requested size
-Options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+Default output: A file gets a sibling result; a folder uses <folder>/shrink-only/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned outputs
 Examples:
   kit img-resize-shrink-only 800x600 photo.jpg
   kit img-resize-shrink-only 800x600 a.jpg b.png
   kit img-resize-shrink-only 1024 ./images --recursive
-Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
@@ -1273,20 +1273,20 @@ img-resize-colorspace() {
         cat << EOF
 Usage: kit img-resize-colorspace <width>x<height> <path>... [options]
 Description: Resize with colorspace correction
+Default output: A file gets a sibling result; a folder uses <folder>/colorspace-resized/
 Colorspace options:
   -m, --colorspace rgb  Linear RGB
   -m, --colorspace lab  LAB perceptual (default)
   -m, --colorspace luv  LUV perceptual
 Other options:
-  -d, --output-dir DIR  Put every output in DIR
-  -r, --recursive       Process directories recursively
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
   -f, --force           Overwrite existing outputs
   -n, --dry-run         Show planned outputs
 Examples:
   kit img-resize-colorspace 800x600 photo.jpg
   kit img-resize-colorspace 800x600 a.jpg b.png -m lab
   kit img-resize-colorspace 1024 ./images -m rgb --recursive
-Output: Creates files with a -resized suffix
 EOF
         return 0
     fi
