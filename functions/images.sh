@@ -25,7 +25,7 @@ Description: Sanitize image filenames by replacing spaces/special chars with und
 Options:
   -s, --sep <char>       Separator: '_' (default) or '-' (for sanitize mode)
   -n, --dry-run          Show what would be renamed without making changes
-  -r, --recursive        Process directories recursively
+  -r, --recursive        Also include matching files in subfolders
   --name <basename>      Sequential mode: rename to basename_1.ext, basename_2.ext
   --start <number>       Starting number for sequential mode (default: 1)
 Examples:
@@ -322,7 +322,7 @@ EOF
     local failed=0
     local file
     for file in "${files[@]}"; do
-            if _process_single_resize_width "$file" "$width" "$force" "$dry_run" "$output_dir"; then
+        if _process_single_resize_width "$file" "$width" "$force" "$dry_run" "$output_dir"; then
             ((count++))
         else
             ((failed++))
@@ -1235,10 +1235,15 @@ img-batch-resize() {
         cat << EOF
 Usage: kit img-batch-resize <width>x<height> <path>... [options]
 Description: Compatibility alias for img-resize
+Default output: A file gets a sibling result; a folder uses <folder>/resized/
+Optional controls:
+  -d, --output-dir DIR  Use a custom result folder
+  -r, --recursive       Also include matching files in subfolders
+  -f, --force           Overwrite existing outputs
+  -n, --dry-run         Show planned outputs
 Examples:
   kit img-batch-resize 800x600 *.jpg
   kit img-batch-resize 1024x1024 ./images --recursive
-Use: kit img-resize -h for all options
 EOF
         return 0
     fi
