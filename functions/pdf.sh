@@ -189,7 +189,7 @@ Usage: kit pdf-merge <path>... [options]
 Description: Combine two or more PDF files into one
 Options:
   -o, --output FILE    Output filename (default: merged.pdf)
-  -r, --recursive      Process directories recursively
+  -r, --recursive      Also include matching files in subfolders
   -f, --force          Overwrite output if it exists
 Examples:
   kit pdf-merge part1.pdf part2.pdf part3.pdf
@@ -757,18 +757,20 @@ pdf-burst() {
         cat << EOF
 Usage: kit pdf-burst <path>... [options]
 Description: Split one or more PDFs into files with a fixed page count
-Options:
+Default output:
+  One file                     Creates a sibling folder such as document_burst/
+  A folder                     Creates <folder>/burst-pdf/ for its results
+Optional controls:
   -p, --pages-per-file NUM  Pages per output file (default: 1)
   -o, --output PATTERN      Filename pattern (default: page_%d.pdf)
-  -d, --output-dir DIR      Output directory
-  -r, --recursive           Process directories recursively
+  -d, --output-dir DIR      Use a custom result folder
+  -r, --recursive           Also include matching files in subfolders
   -f, --force               Overwrite existing outputs
 Examples:
   kit pdf-burst document.pdf
   kit pdf-burst report.pdf invoice.pdf --pages-per-file 2
   kit pdf-burst ./documents --recursive
   kit pdf-burst document.pdf -d split -o "part_%d.pdf"
-Output: Uses an input_burst/ directory for each PDF by default
 EOF
         return 0
     fi
@@ -824,14 +826,16 @@ EOF
     done
 
     _kit_collect_files _kit_is_pdf_file "$recursive" PDF "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "burst-pdf"
     local -a inputs=("${reply[@]}")
     _kit_check_qpdf || return 1
 
-    local input current_dir
+    local input current_dir index
     local success=0
     local failed=0
     local -a burst_args=()
-    for input in "${inputs[@]}"; do
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
         burst_args=("$input" "$chunk_size")
         [[ "$force" == true ]] && burst_args+=(--force)
         [[ -n "$output_pattern" ]] && burst_args+=(--output "$output_pattern")
@@ -842,6 +846,9 @@ EOF
                 current_dir="$output_dir/${input:t:r}_burst"
             fi
             burst_args+=(--dir "$current_dir")
+        else
+            _kit_default_result_dir_for_collected "$input" burst-pdf _burst || return 1
+            burst_args+=(--dir "$REPLY")
         fi
         if _kit_pdf_burst_one "${burst_args[@]}"; then
             ((success++))
