@@ -27,11 +27,14 @@ Page syntax:
   Range: "2-20"
   Multiple pages: "1,5,19"
   Mixed: "1-5,10,15-20"
-Options:
+Default output:
+  One file                 Creates a sibling result
+  A folder                 Creates <folder>/split-pdf/ for its results
+Optional controls:
   -p, --pages PAGES      Pages to extract
   -o, --output FILE      Output filename, valid with one input only
-  -d, --output-dir DIR   Put every output in DIR
-  -r, --recursive        Process directories recursively
+  -d, --output-dir DIR   Use a custom result folder
+  -r, --recursive        Also include matching files in subfolders
   -f, --force            Overwrite existing outputs
 Examples:
   kit pdf-split --pages "1-10" document.pdf
@@ -114,6 +117,7 @@ EOF
     fi
 
     _kit_collect_files _kit_is_pdf_file "$recursive" PDF "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "split-pdf"
     local -a inputs=("${reply[@]}")
     if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
         echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
@@ -128,17 +132,20 @@ EOF
     _kit_prepare_output_dir "$output_dir" || return 1
     local sanitized_pages="${pages//,/_}"
     sanitized_pages="${sanitized_pages//-/_}"
-    local input current_output
+    local input current_output index
     local -a outputs=()
     local -A seen_outputs=()
-    for input in "${inputs[@]}"; do
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
         if [[ -n "$output" ]]; then
             current_output="$output"
         elif [[ -n "$output_dir" ]]; then
             current_output="$output_dir/${input:t:r}_pages_${sanitized_pages}.pdf"
         else
-            current_output="${input:r}_pages_${sanitized_pages}.pdf"
+            _kit_default_output_for_collected "$input" split-pdf "_pages_${sanitized_pages}" pdf || return 1
+            current_output="$REPLY"
         fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
         if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$current_output'" >&2
             return 1
@@ -153,7 +160,6 @@ EOF
 
     local success=0
     local failed=0
-    local index
     for ((index=1; index<=${#inputs[@]}; index++)); do
         input="${inputs[$index]}"
         current_output="${outputs[$index]}"
@@ -274,15 +280,19 @@ pdf-compress() {
                 cat << EOF
 Usage: kit pdf-compress <path>... [options]
 Description: Compress one or more PDF files using linearization and object streams
-Options:
+Default output:
+  One file                 Creates a sibling such as report_compressed.pdf
+  A folder                 Creates <folder>/compressed-pdf/ for its results
+Optional controls:
   -o, --output FILE      Output filename, valid with one input only
-  -d, --output-dir DIR   Put every output in DIR
-  -r, --recursive        Process directories recursively
+  -d, --output-dir DIR   Use a custom result folder
+  -r, --recursive        Also include matching files in subfolders
   -f, --force            Overwrite existing outputs
 Examples:
   kit pdf-compress large_scan.pdf
   kit pdf-compress report.pdf invoice.pdf
-  kit pdf-compress ./documents --recursive --output-dir ./compressed
+  kit pdf-compress documents
+  kit pdf-compress documents --recursive
   kit pdf-compress report.pdf -o report_small.pdf
   kit pdf-compress document.pdf --force
 EOF
@@ -329,6 +339,7 @@ EOF
     fi
 
     _kit_collect_files _kit_is_pdf_file "$recursive" PDF "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "compressed-pdf"
     local -a inputs=("${reply[@]}")
     if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
         echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
@@ -341,17 +352,20 @@ EOF
     fi
 
     _kit_prepare_output_dir "$output_dir" || return 1
-    local input current_output
+    local input current_output index
     local -a outputs=()
     local -A seen_outputs=()
-    for input in "${inputs[@]}"; do
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
         if [[ -n "$output" ]]; then
             current_output="$output"
         elif [[ -n "$output_dir" ]]; then
             current_output="$output_dir/${input:t:r}_compressed.pdf"
         else
-            current_output="${input:r}_compressed.pdf"
+            _kit_default_output_for_collected "$input" compressed-pdf _compressed pdf || return 1
+            current_output="$REPLY"
         fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
         if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$current_output'" >&2
             return 1
@@ -366,7 +380,7 @@ EOF
 
     local success=0
     local failed=0
-    local original_size compressed_size index
+    local original_size compressed_size
     for ((index=1; index<=${#inputs[@]}; index++)); do
         input="${inputs[$index]}"
         current_output="${outputs[$index]}"
@@ -406,12 +420,15 @@ Page syntax (optional, default: all pages):
   Range: "2-20"
   Multiple pages: "1,5,19"
   Mixed: "1-5,10,15-20"
-Options:
+Default output:
+  One file                 Creates a sibling such as scan_rotated.pdf
+  A folder                 Creates <folder>/rotated-pdf/ for its results
+Optional controls:
   -a, --degrees NUM      Rotation: 90, 180, or 270
   -p, --pages PAGES      Pages to rotate (default: all)
   -o, --output FILE      Output filename, valid with one input only
-  -d, --output-dir DIR   Put every output in DIR
-  -r, --recursive        Process directories recursively
+  -d, --output-dir DIR   Use a custom result folder
+  -r, --recursive        Also include matching files in subfolders
   -f, --force            Overwrite existing outputs
 Examples:
   kit pdf-rotate --degrees 90 scan.pdf
@@ -504,6 +521,7 @@ EOF
     fi
 
     _kit_collect_files _kit_is_pdf_file "$recursive" PDF "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "rotated-pdf"
     local -a inputs=("${reply[@]}")
     if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
         echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
@@ -521,17 +539,20 @@ EOF
     fi
 
     _kit_prepare_output_dir "$output_dir" || return 1
-    local input current_output
+    local input current_output index
     local -a outputs=()
     local -A seen_outputs=()
-    for input in "${inputs[@]}"; do
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
         if [[ -n "$output" ]]; then
             current_output="$output"
         elif [[ -n "$output_dir" ]]; then
             current_output="$output_dir/${input:t:r}_rotated.pdf"
         else
-            current_output="${input:r}_rotated.pdf"
+            _kit_default_output_for_collected "$input" rotated-pdf _rotated pdf || return 1
+            current_output="$REPLY"
         fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
         if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$current_output'" >&2
             return 1
@@ -546,7 +567,6 @@ EOF
 
     local success=0
     local failed=0
-    local index
     for ((index=1; index<=${#inputs[@]}; index++)); do
         input="${inputs[$index]}"
         current_output="${outputs[$index]}"

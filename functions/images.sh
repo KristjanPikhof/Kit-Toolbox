@@ -94,6 +94,7 @@ EOF
     fi
 
     _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "resized"
     local -a files=("${reply[@]}")
 
     _kit_image_sanitized_path() {
@@ -280,7 +281,8 @@ EOF
 
         local filename="${input%.*}"
         local extension="${input##*.}"
-        local output="${filename}-resized.${extension}"
+        _kit_default_output_for_collected "$input" resized -resized "$extension" || return 1
+        local output="$REPLY"
         [[ -n "$output_dir" ]] && output="$output_dir/${input:t:r}-resized.${extension}"
 
         # Prevent double resizing
@@ -304,6 +306,8 @@ EOF
             echo "Would resize: $input -> $output"
             return 0
         fi
+
+        _kit_prepare_output_dir "${output:h}" || return 1
 
         if magick "$input" -resize "$width" "$output" 2>/dev/null; then
             echo "✅ Created: $output"
@@ -406,6 +410,7 @@ EOF
     fi
 
     _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "resized"
     local -a files=("${reply[@]}")
 
     if ! _kit_require magick imagemagick; then
@@ -428,7 +433,8 @@ EOF
 
         local filename="${input%.*}"
         local extension="${input##*.}"
-        local output="${filename}-resized.${extension}"
+        _kit_default_output_for_collected "$input" resized -resized "$extension" || return 1
+        local output="$REPLY"
         [[ -n "$output_dir" ]] && output="$output_dir/${input:t:r}-resized.${extension}"
 
         # Prevent double resizing
@@ -452,6 +458,8 @@ EOF
             echo "Would resize: $input -> $output"
             return 0
         fi
+
+        _kit_prepare_output_dir "${output:h}" || return 1
 
         if magick "$input" -filter Lanczos -resize "$percentage%" "$output" 2>/dev/null; then
             echo "✅ Created: $output (resized to $percentage% with Lanczos filter)"
@@ -546,6 +554,7 @@ EOF
     done
 
     _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "optimized"
     local -a files=("${reply[@]}")
 
     if ! _kit_require magick imagemagick; then
@@ -567,7 +576,8 @@ EOF
 
         local filename="${input%.*}"
         local extension="${input##*.}"
-        local output="${filename}-optimized.${extension}"
+        _kit_default_output_for_collected "$input" optimized -optimized "$extension" || return 1
+        local output="$REPLY"
         [[ -n "$output_dir" ]] && output="$output_dir/${input:t:r}-optimized.${extension}"
 
         # Prevent double optimization
@@ -591,6 +601,8 @@ EOF
             echo "Would optimize: $input -> $output"
             return 0
         fi
+
+        _kit_prepare_output_dir "${output:h}" || return 1
 
         if magick "$input" -strip -quality 85 "$output" 2>/dev/null; then
             echo "✅ Created: $output"
@@ -691,6 +703,7 @@ EOF
 
     _kit_matches_conversion_source() { _kit_file_has_extension "$1" "$from_format"; }
     _kit_collect_files _kit_matches_conversion_source "$recursive" ".${from_format:l} image" "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "converted"
     local -a input_files=("${reply[@]}")
 
     _kit_require magick imagemagick || return 1
@@ -698,16 +711,19 @@ EOF
         _kit_prepare_output_dir "$output_dir" || return 1
     fi
 
-    local file parent filename destination_dir output
+    local file filename output
     local success=0
     local failed=0
     local -A outputs=()
     local -a planned_outputs=()
     for file in "${input_files[@]}"; do
-        parent="${file:h}"
         filename="${file:t:r}"
-        destination_dir="${output_dir:-$parent/converted}"
-        output="$destination_dir/$filename.${to_format:l}"
+        if [[ -n "$output_dir" ]]; then
+            output="$output_dir/$filename.${to_format:l}"
+        else
+            _kit_default_output_for_collected "$file" converted "" "${to_format:l}" || return 1
+            output="$REPLY"
+        fi
         if [[ -n "${outputs[${output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$output'" >&2
             return 1
@@ -797,15 +813,20 @@ EOF
 
     [[ ${#targets[@]} -eq 0 ]] && targets=(.)
     _kit_collect_files _kit_is_webp_source_file "$recursive" image "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "optimized"
     local -a files=("${reply[@]}")
     _kit_require magick imagemagick || return 1
 
-    local file destination_dir output
+    local file output
     local -a outputs=()
     local -A seen_outputs=()
     for file in "${files[@]}"; do
-        destination_dir="${output_dir:-${file:h}/optimized}"
-        output="$destination_dir/${file:t:r}.webp"
+        if [[ -n "$output_dir" ]]; then
+            output="$output_dir/${file:t:r}.webp"
+        else
+            _kit_default_output_for_collected "$file" optimized "" webp || return 1
+            output="$REPLY"
+        fi
         if [[ -n "${seen_outputs[${output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$output'" >&2
             return 1
@@ -917,6 +938,7 @@ EOF
     fi
 
     _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "resized"
     local -a files=("${reply[@]}")
 
     if ! _kit_require magick imagemagick; then
@@ -939,7 +961,8 @@ EOF
 
         local filename="${input%.*}"
         local extension="${input##*.}"
-        local output="${filename}-resized.${extension}"
+        _kit_default_output_for_collected "$input" resized -resized "$extension" || return 1
+        local output="$REPLY"
         [[ -n "$output_dir" ]] && output="$output_dir/${input:t:r}-resized.${extension}"
 
         # Prevent double resizing
@@ -963,6 +986,8 @@ EOF
             echo "Would resize: $input -> $output"
             return 0
         fi
+
+        _kit_prepare_output_dir "${output:h}" || return 1
 
         if magick "$input" -resize "$size" "$output" 2>/dev/null; then
             echo "✅ Created: $output"
@@ -991,6 +1016,16 @@ EOF
 _kit_run_image_resize_many() {
     local mode="$1"
     shift
+
+    local result_folder
+    case "$mode" in
+        thumbnail) result_folder="thumbnails" ;;
+        exact) result_folder="resized-exact" ;;
+        fill) result_folder="resized-fill" ;;
+        adaptive) result_folder="adaptive-resized" ;;
+        shrink) result_folder="shrink-only" ;;
+        colorspace) result_folder="colorspace-resized" ;;
+    esac
 
     local size=""
     local recursive=false
@@ -1046,6 +1081,7 @@ _kit_run_image_resize_many() {
     fi
 
     _kit_collect_files _kit_is_image_file "$recursive" image "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "$result_folder"
     local -a files=("${reply[@]}")
     _kit_require magick imagemagick || return 1
 
@@ -1056,7 +1092,8 @@ _kit_run_image_resize_many() {
         if [[ -n "$output_dir" ]]; then
             output="$output_dir/${file:t:r}-resized.${file:e}"
         else
-            output="${file:r}-resized.${file:e}"
+            _kit_default_output_for_collected "$file" "$result_folder" -resized "${file:e}" || return 1
+            output="$REPLY"
         fi
         if [[ -n "${seen_outputs[${output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$output'" >&2
