@@ -64,6 +64,19 @@ img-resize 100x100 "$TMP/images" >/dev/null; rc=$?
 assert_status "img-resize accepts a folder without output options" "$rc" 0
 assert_file "img-resize creates its default result folder" "$TMP/images/resized/a-resized.jpg"
 
+mkdir -p "$TMP/width-images"
+touch "$TMP/width-images/one.jpg"
+img-resize-width 100 "$TMP/width-images" --recursive >/dev/null; rc=$?
+assert_status "img-resize-width uses a default folder" "$rc" 0
+assert_file "img-resize-width creates its named result folder" "$TMP/width-images/resized/one-resized.jpg"
+img-resize-width 100 "$TMP/width-images" --recursive --force >/dev/null; rc=$?
+assert_status "img-resize-width can rerun a folder safely" "$rc" 0
+if [[ ! -d "$TMP/width-images/resized/resized" ]]; then
+    pass "img-resize-width does not process its own result folder"
+else
+    fail "img-resize-width does not process its own result folder" "nested result folder was created"
+fi
+
 img-thumbnail 80x80 "$TMP/images/nested" --recursive --output-dir "$TMP/thumbs" >/dev/null; rc=$?
 assert_status "img-thumbnail accepts a directory" "$rc" 0
 assert_file "img-thumbnail creates directory output" "$TMP/thumbs/c-resized.webp"
