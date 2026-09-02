@@ -41,6 +41,12 @@ assert_equals "recursive scan includes nested matches" "${reply[*]}" "$TMP/image
 _kit_collect_files _kit_is_image_file false image "$TMP/images/a.jpg" "$TMP/images"; rc=$?
 assert_status "deduplicates mixed inputs" "$rc" 0
 assert_equals "mixed input keeps first occurrence" "${reply[*]}" "$TMP/images/a.jpg $TMP/images/b.PNG"
+assert_equals "tracks explicit and directory origins" "${(j:|:)reply_origins}" "|$TMP/images"
+assert_equals "tracks paths below directory inputs" "${(j:|:)reply_relatives}" "a.jpg|b.PNG"
+
+_kit_collect_files _kit_is_image_file true image "$TMP/images"; rc=$?
+_kit_default_output_path "${reply[3]}" "${reply_origins[3]}" "${reply_relatives[3]}" resized -resized jpg
+assert_equals "default output preserves a nested source path" "$REPLY" "$TMP/images/resized/nested/c-resized.jpg"
 
 _kit_collect_files _kit_is_image_file false image "$TMP/images/readme.txt" >/dev/null 2>&1; rc=$?
 assert_status "rejects an explicit unsupported file" "$rc" 1
