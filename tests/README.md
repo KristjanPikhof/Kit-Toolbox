@@ -127,7 +127,7 @@ Generated Test Files:
   test_input_small-resized.jpg
   test_input_1920x1080-optimized.jpg
   test_input_video_compressed.mp4
-  test_input_video_noaudio.mp4
+  test_input_video-remove-audio.mp4
   ...
 
 Test complete! Clean up test assets?
@@ -165,10 +165,10 @@ The test suite uses clear naming to distinguish input from output files:
 - `test_input_1920x1080-optimized.jpg` - Optimized image output
 - `test_input_small-resized.jpg` - Thumbnail output
 - `test_input_video_compressed.mp4` - Compressed video output
-- `test_input_video_noaudio.mp4` - Video without audio output
+- `test_input_video-remove-audio.mp4` - Video without audio output
 - `youtube_compressed.mp4` - Compressed YouTube video
 - `<youtube_title>.mp3` - Extracted MP3 from YouTube video
-- `<youtube_title>_noaudio.mp4` - YouTube video without audio
+- `<youtube_title>-remove-audio.mp4` - YouTube video without audio
 
 ## Test Output
 

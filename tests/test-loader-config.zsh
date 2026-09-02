@@ -25,11 +25,12 @@ trap cleanup EXIT INT TERM
 mkdir -p "$FIXTURE" "$FIXTURE/lib" "$HOME_DIR" "$HOME_DIR/goto-target" "$HOME_DIR/tilde-target" "$TMP/target-one" "$TMP/target-two" "$TMP/target with spaces" "$TMP/work" "$TMP/bin"
 ln -s "$ROOT/loader.zsh" "$FIXTURE/loader.zsh"
 ln -s "$ROOT/lib/kit-core.zsh" "$FIXTURE/lib/kit-core.zsh"
+ln -s "$ROOT/lib/kit-files.zsh" "$FIXTURE/lib/kit-files.zsh"
 ln -s "$ROOT/functions" "$FIXTURE/functions"
 ln -s "$ROOT/completions" "$FIXTURE/completions"
 ln -s "$ROOT/categories.conf" "$FIXTURE/categories.conf"
 ln -s "$ROOT/VERSION" "$FIXTURE/VERSION"
-touch "$TMP/work/existing.txt"
+touch "$TMP/work/existing.txt" "$TMP/work/second.txt"
 
 cat > "$TMP/bin/fake-editor" <<'EOF'
 #!/bin/zsh
@@ -154,8 +155,8 @@ quoted|fake-editor '--quoted arg'|Fake editor with quoted arg
 print -r -- "openapp|fake-open -a \"Fake App\"|Fake open app" >> "$FIXTURE/editor.conf"
 print -r -- "spaceexe|\"$TMP/bin/fake editor\" --flag|Fake executable path with spaces" >> "$FIXTURE/editor.conf"
 out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; kit edit -h; edit -h')
-assert_contains "kit <editor> -h shows usage" "$out" "Usage: kit edit <file|folder>"
-assert_contains "direct <editor> -h shows usage" "$out" "Description: Open file or folder with Fake editor"
+assert_contains "kit <editor> -h shows usage" "$out" "Usage: kit edit <path>..."
+assert_contains "direct <editor> -h shows usage" "$out" "Description: Open one or more files or folders with Fake editor"
 
 out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; declare -f edit; print -r -- SPLIT; declare -f classic; print -r -- SPLIT; declare -f quoted')
 assert_contains "editor wrapper delegates to _kit_run_editor" "$out" "_kit_run_editor edit"
@@ -180,6 +181,10 @@ assert_contains "fake-open target is separate argv item" "$out" "CALL:fake-open:
 assert_contains "quoted executable path with spaces runs" "$out" "CALL:fake editor:argc=2"
 assert_contains "quoted executable path with spaces preserves flag" "$out" "CALL:fake editor:argv[1]=--flag"
 assert_contains "quoted executable path with spaces preserves target" "$out" "CALL:fake editor:argv[2]=existing.txt"
+
+out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; edit existing.txt second.txt; cat "$KIT_FAKE_EDITOR_LOG"')
+assert_contains "editor accepts multiple targets" "$out" "CALL:fake-editor:argc=2"
+assert_contains "editor passes the second target" "$out" "CALL:fake-editor:argv[2]=second.txt"
 
 out=$(run_zsh 'source "$KIT_EXT_DIR/loader.zsh" >/dev/null; edit >/dev/null; print -r -- missing:$?; edit nope >/dev/null; print -r -- nonexistent:$?')
 assert_contains "editor missing target returns 2" "$out" "missing:2"

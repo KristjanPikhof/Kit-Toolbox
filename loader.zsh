@@ -27,6 +27,13 @@ else
     return 1
 fi
 
+if [[ -f "$KIT_EXT_DIR/lib/kit-files.zsh" ]]; then
+    source "$KIT_EXT_DIR/lib/kit-files.zsh" || return 1
+else
+    echo "Error: Kit file helpers not found at $KIT_EXT_DIR/lib/kit-files.zsh" >&2
+    return 1
+fi
+
 # Read version from VERSION file
 KIT_VERSION="${KIT_VERSION:-unknown}"
 if [[ -f "$KIT_EXT_DIR/VERSION" ]]; then
@@ -240,28 +247,30 @@ _kit_run_editor() {
     local desc="${KIT_EDITOR_DESCS[$editor_name]}"
 
     if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-        echo "Usage: kit $editor_name <file|folder>"
-        echo "Description: Open file or folder with $desc"
+        echo "Usage: kit $editor_name <path>..."
+        echo "Description: Open one or more files or folders with $desc"
         echo ""
         echo "Examples:"
         echo "  kit $editor_name myfile.md"
+        echo "  kit $editor_name first.md second.md"
         echo "  kit $editor_name ."
         return 0
     fi
 
     if [[ -z "$1" ]]; then
         echo "Error: Missing file or folder path" >&2
-        echo "Usage: kit $editor_name <file|folder>" >&2
+        echo "Usage: kit $editor_name <path>..." >&2
         return 2
     fi
 
-    local target="$1"
-
-    # Check if target exists (skip for current directory)
-    if [[ ! -e "$target" && "$target" != "." ]]; then
-        echo "Error: '$target' does not exist" >&2
-        return 1
-    fi
+    local -a targets=("$@")
+    local target
+    for target in "${targets[@]}"; do
+        if [[ ! -e "$target" && "$target" != "." ]]; then
+            echo "Error: '$target' does not exist" >&2
+            return 1
+        fi
+    done
 
     local -a editor_argv
     editor_argv=("${(@Q)${(z)editor_cmd}}")
@@ -270,7 +279,7 @@ _kit_run_editor() {
         return 1
     fi
 
-    "${editor_argv[@]}" "$target"
+    "${editor_argv[@]}" "${targets[@]}"
 }
 
 _kit_generate_editors() {
@@ -467,10 +476,10 @@ kit() {
 
                     # Get description
                     local short_desc=$(declare -f "$func" 2>/dev/null | \
-                        grep -o 'Usage:.*$' | head -1 | sed 's/Usage: kit [^ ]* *//' | sed 's/ *Example.*//' | sed 's/"$//' | cut -c1-45)
+                        grep -o 'Usage:.*$' | head -1 | sed 's/Usage: kit [^ ]* *//' | sed 's/ *Example.*//' | sed 's/"$//')
                     if [[ -z "$short_desc" ]]; then
                         short_desc=$(declare -f "$func" 2>/dev/null | \
-                            grep -o 'Description:.*$' | head -1 | sed 's/Description: //' | cut -c1-45)
+                            grep -o 'Description:.*$' | head -1 | sed 's/Description: //')
                     fi
 
                     # Format function name with alias if present
@@ -510,6 +519,15 @@ kit() {
             done
             echo ""
         fi
+
+        echo "${CYAN}📂 File Command Basics${NC}"
+        echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
+        echo "  ${YELLOW}kit ${GREEN}<command>${NC} file            Process one file"
+        echo "  ${YELLOW}kit ${GREEN}<command>${NC} file1 file2     Process several files"
+        echo "  ${YELLOW}kit ${GREEN}<command>${NC} folder          Process matching files in a folder"
+        echo "  ${DIM}Folder results get a named subfolder. --recursive also includes nested folders.${NC}"
+        echo "  ${DIM}Run kit <command> -h to see exact outputs, options, and examples.${NC}"
+        echo ""
 
         echo "${CYAN}💡 Getting Started${NC}"
         echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"

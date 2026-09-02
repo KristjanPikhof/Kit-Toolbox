@@ -128,6 +128,19 @@ kit img-resize 800x600 myimage.jpg
 kit yt-download mp3 "https://youtube.com/watch?v=..."
 ```
 
+### File and directory inputs
+
+File processing commands use the same input rules. Pass one file, several files, a directory, or a mixture of files and directories. A directory processes matching files from its top level. Use `--recursive` only when you also want files from folders inside it.
+
+```bash
+kit img-resize 800x600 photo.jpg
+kit img-resize 800x600 photo.jpg cover.png
+kit img-resize 800x600 ./images
+kit img-resize 800x600 ./images extra.png --recursive
+```
+
+Commands ignore unrelated files found inside a directory, but reject an explicitly supplied file of the wrong type. For transforms that create new files, a direct file gets a sibling result and a directory gets a named result folder inside it. For example, `kit remove-audio videos` creates `videos/removed-audio/`. `--output` and `--output-dir` are optional overrides.
+
 ## Available Functions
 
 ### 📷 Image Processing
@@ -143,7 +156,7 @@ Process images using ImageMagick:
 - **img-resize-exact** — Force exact dimensions (may distort)
 - **img-resize-fill** — Resize to fill area, crop excess
 - **img-adaptive-resize** — Quality resize with mesh interpolation
-- **img-batch-resize** — Batch resize multiple images
+- **img-batch-resize** — Compatibility alias for `img-resize`
 - **img-resize-shrink-only** — Only shrink images, never enlarge
 - **img-resize-colorspace** — Resize with colorspace correction
 
@@ -320,9 +333,10 @@ $ kit --search resize
 
 # Show help for resize function
 $ kit img-resize -h
-Usage: kit img-resize <width>x<height> <file|directory> [options]
-Example: 
+Usage: kit img-resize <width>x<height> <path>... [options]
+Examples:
   kit img-resize 800x600 photo.jpg
+  kit img-resize 800x600 photo.jpg cover.png
   kit img-resize 1024 . --recursive
   kit img-resize 1920x1080 . --dry-run
 
@@ -365,6 +379,12 @@ kit convert-to-mp3 recording.m4a
 # Small voice recording: 48kbps mono at 24kHz
 kit convert-to-mp3 recording.m4a --preset speech
 
+# Convert every supported file in a directory to recordings/converted-to-mp3/
+kit convert-to-mp3 recordings
+
+# Also include recordings stored in folders inside recordings/
+kit convert-to-mp3 recordings --recursive
+
 # Exact bitrate and custom output
 kit convert-to-mp3 music.m4a --bitrate 128 --output music.mp3
 
@@ -388,9 +408,14 @@ kit yt-download mp4 "https://youtube.com/watch?v=..."
 
 ```bash
 kit remove-audio video.mp4
+kit remove-audio intro.mp4 outro.mov
+kit remove-audio videos
+kit remove-audio videos --recursive
 kit remove-audio source.mkv --output silent.mkv
 kit remove-audio source.mov --reencode --output silent.mp4
 ```
+
+The simple forms choose the destination for you. A direct file such as `video.mp4` creates `video-remove-audio.mp4` beside it. A folder such as `videos` creates `videos/removed-audio/`. `--recursive` means Kit also looks in folders inside `videos`; it is not needed for files directly in `videos`.
 
 #### Video Compression Examples
 
@@ -399,6 +424,7 @@ The `compress-video` function supports multiple options for controlling output q
 ```bash
 # Basic compression (default settings)
 kit compress-video video.mp4
+kit compress-video videos
 
 # High compression for uploads (higher CRF = smaller file, lower quality)
 kit compress-video video.mp4 -c 28 -o small.mp4
@@ -417,8 +443,10 @@ kit compress-video video.mp4 -p ultrafast -c 26
 kit compress-video video.mp4 -p veryslow -c 22
 ```
 
-**Options:**
-- `-o, --output FILE` — Output filename (default: input_compressed.mp4)
+**Optional controls:**
+- `-o, --output FILE` — Custom output name for one input
+- `-d, --output-dir DIR` — Custom result folder
+- `-r, --recursive` — Also include matching files in folders inside the selected folder
 - `-c, --crf NUM` — Quality level 18-28 (default: 23, lower = better)
 - `-p, --preset PRESET` — Encoding speed (default: slow)
   - Options: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow
@@ -444,26 +472,30 @@ kit compress-video video.mp4 -p veryslow -c 22
 # Split PDF into multiple files
 # Default: creates "input_burst/" folder with "page_1.pdf", "page_2.pdf"...
 kit pdf-burst document.pdf
-kit pdf-burst document.pdf 2 -d my_folder    # 2 pages per file in custom folder
+kit pdf-burst document.pdf --pages-per-file 2 --output-dir my_folder
+kit pdf-burst report.pdf invoice.pdf --pages-per-file 2
 kit pdf-burst document.pdf -o "report_%d.pdf" # Custom filename pattern
 
 # Split pages from a PDF
-kit pdf-split document.pdf "1-10"
-kit pdf-split document.pdf "1,3,5,7" -o odd_pages.pdf
-kit pdf-split book.pdf "50-100" --force
+kit pdf-split --pages "1-10" document.pdf
+kit pdf-split --pages "1,3,5,7" report.pdf invoice.pdf
+kit pdf-split --pages "50-100" books
 
 # Merge multiple PDFs
 kit pdf-merge part1.pdf part2.pdf part3.pdf
 kit pdf-merge *.pdf -o combined.pdf
+kit pdf-merge ./chapters -o combined.pdf
 
 # Compress a PDF
 kit pdf-compress large_scan.pdf
+kit pdf-compress report.pdf invoice.pdf
+kit pdf-compress documents
 kit pdf-compress report.pdf -o report_small.pdf
 
 # Rotate PDF pages
-kit pdf-rotate scan.pdf 90                    # Rotate all pages
-kit pdf-rotate doc.pdf 180 "1,3"              # Rotate specific pages
-kit pdf-rotate book.pdf 270 "5-10" -o fixed.pdf
+kit pdf-rotate --degrees 90 scan.pdf
+kit pdf-rotate --degrees 180 --pages "1,3" report.pdf invoice.pdf
+kit pdf-rotate --degrees 270 documents
 ```
 
 ## Development & Extension

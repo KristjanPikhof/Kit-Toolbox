@@ -39,6 +39,7 @@ chmod +x "$TMP/bin/yt-dlp"
 PATH="$TMP/bin:$PATH"
 rehash
 
+source "$ROOT/lib/kit-files.zsh"
 source "$MEDIA"
 _kit_require() { command -v "$1" >/dev/null 2>&1 }
 
@@ -154,6 +155,11 @@ input_video_hash=$(ffmpeg -v error -nostdin -i "$TMP/video.mp4" -map 0:v:0 -c co
 muted_video_hash=$(ffmpeg -v error -nostdin -i "$TMP/muted.mp4" -map 0:v:0 -c copy -f hash -hash sha256 - 2>/dev/null)
 assert_equals "remove-audio preserves encoded video packets" "$muted_video_hash" "$input_video_hash"
 
+out=$(remove-audio "$TMP/video.mp4" 2>&1)
+rc=$?
+assert_status "remove-audio simple file default succeeds" "$rc" 0
+assert_file_exists "remove-audio names a sibling result clearly" "$TMP/video-remove-audio.mp4"
+
 out=$(remove-audio "$TMP/video.mp4" --reencode --output "$TMP/muted-reencoded.mp4" 2>&1)
 rc=$?
 assert_status "remove-audio explicit re-encode succeeds" "$rc" 0
@@ -195,6 +201,65 @@ assert_status "compress-video rejects widths below two pixels" "$rc" 2
 out=$(compress-video "$TMP/video.mp4" --bitrate nope --output "$TMP/invalid-bitrate.mp4" 2>&1)
 rc=$?
 assert_status "compress-video validates audio bitrate" "$rc" 2
+
+mkdir -p "$TMP/media-batch/audio" "$TMP/media-batch/video"
+cp "$TMP/voice sample.m4a" "$TMP/media-batch/audio/first.m4a"
+cp "$TMP/voice sample.m4a" "$TMP/media-batch/audio/second.m4a"
+out=$(convert-to-mp3 "$TMP/media-batch/audio" --output-dir "$TMP/media-batch/mp3" 2>&1)
+rc=$?
+assert_status "convert-to-mp3 accepts a directory" "$rc" 0
+assert_file_exists "convert-to-mp3 creates first batch output" "$TMP/media-batch/mp3/first.mp3"
+assert_file_exists "convert-to-mp3 creates second batch output" "$TMP/media-batch/mp3/second.mp3"
+
+mkdir -p "$TMP/media-default/audio/nested"
+cp "$TMP/voice sample.m4a" "$TMP/media-default/audio/first.m4a"
+cp "$TMP/voice sample.m4a" "$TMP/media-default/audio/nested/second.m4a"
+out=$(convert-to-mp3 "$TMP/media-default/audio" --recursive 2>&1)
+rc=$?
+assert_status "convert-to-mp3 folder default succeeds" "$rc" 0
+assert_file_exists "convert-to-mp3 creates its default result folder" "$TMP/media-default/audio/converted-to-mp3/first.mp3"
+assert_file_exists "convert-to-mp3 preserves nested paths" "$TMP/media-default/audio/converted-to-mp3/nested/second.mp3"
+
+cp "$TMP/video.mp4" "$TMP/media-batch/video/first.mp4"
+cp "$TMP/video.mp4" "$TMP/media-batch/video/second.mp4"
+out=$(remove-audio "$TMP/media-batch/video/first.mp4" "$TMP/media-batch/video/second.mp4" --output-dir "$TMP/media-batch/silent" 2>&1)
+rc=$?
+assert_status "remove-audio accepts multiple files" "$rc" 0
+assert_file_exists "remove-audio creates first batch output" "$TMP/media-batch/silent/first-remove-audio.mp4"
+assert_file_exists "remove-audio creates second batch output" "$TMP/media-batch/silent/second-remove-audio.mp4"
+
+mkdir -p "$TMP/media-default/video/nested"
+cp "$TMP/video.mp4" "$TMP/media-default/video/first.mp4"
+cp "$TMP/video.mp4" "$TMP/media-default/video/nested/second.mp4"
+out=$(remove-audio "$TMP/media-default/video" --recursive 2>&1)
+rc=$?
+assert_status "remove-audio folder default succeeds" "$rc" 0
+assert_file_exists "remove-audio creates its default result folder" "$TMP/media-default/video/removed-audio/first-remove-audio.mp4"
+assert_file_exists "remove-audio preserves nested paths" "$TMP/media-default/video/removed-audio/nested/second-remove-audio.mp4"
+
+out=$(remove-audio "$TMP/media-default/video" --recursive --force 2>&1)
+rc=$?
+assert_status "remove-audio can rerun a folder safely" "$rc" 0
+if [[ ! -d "$TMP/media-default/video/removed-audio/removed-audio" ]]; then
+    pass "remove-audio does not process its own result folder"
+else
+    fail "remove-audio does not process its own result folder" "nested result folder was created"
+fi
+
+out=$(compress-video "$TMP/media-batch/video" --preset ultrafast --output-dir "$TMP/media-batch/compressed" 2>&1)
+rc=$?
+assert_status "compress-video accepts a directory" "$rc" 0
+assert_file_exists "compress-video creates first batch output" "$TMP/media-batch/compressed/first_compressed.mp4"
+assert_file_exists "compress-video creates second batch output" "$TMP/media-batch/compressed/second_compressed.mp4"
+
+out=$(compress-video "$TMP/media-default/video" --preset ultrafast 2>&1)
+rc=$?
+assert_status "compress-video folder default succeeds" "$rc" 0
+assert_file_exists "compress-video creates its default result folder" "$TMP/media-default/video/compressed-video/first-compressed.mp4"
+
+out=$(convert-to-mp3 "$TMP/media-batch/audio" --output "$TMP/not-allowed.mp3" 2>&1)
+rc=$?
+assert_status "batch conversion rejects one output filename" "$rc" 2
 
 print -r -- "input" > "$TMP/race-input.dat"
 race_output="$TMP/race-output.dat"

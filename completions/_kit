@@ -107,6 +107,11 @@ _kit_get_custom_completion() {
     local previous_word="${words[$((pos - 1))]:-}"
     local current_word="${words[$pos]:-}"
 
+    if [[ "$previous_word" == "-d" || "$previous_word" == "--output-dir" || "$previous_word" == "--dir" ]]; then
+        _files -/
+        return 0
+    fi
+
     case "$cmd" in
         yt-download)
             if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
@@ -136,7 +141,7 @@ _kit_get_custom_completion() {
                 return 0
             fi
             if [[ "$current_word" == -* ]]; then
-                _values 'options' '-p' '--preset' '-b' '--bitrate' '-o' '--output' '-f' '--force' '-v' '--verbose'
+                _values 'options' '-p' '--preset' '-b' '--bitrate' '-o' '--output' '-d' '--output-dir' '-r' '--recursive' '-f' '--force' '-v' '--verbose'
                 return 0
             fi
             ;;
@@ -146,7 +151,7 @@ _kit_get_custom_completion() {
                 return 0
             fi
             if [[ "$current_word" == -* ]]; then
-                _values 'options' '-o' '--output' '-r' '--reencode' '-f' '--force' '-v' '--verbose'
+                _values 'options' '-o' '--output' '-d' '--output-dir' '-r' '--recursive' '--reencode' '-f' '--force' '-v' '--verbose'
                 return 0
             fi
             ;;
@@ -160,7 +165,93 @@ _kit_get_custom_completion() {
                 return 0
             fi
             if [[ "$current_word" == -* ]]; then
-                _values 'options' '-o' '--output' '-c' '--crf' '-p' '--preset' '-w' '--width' '-b' '--bitrate' '-f' '--force' '-v' '--verbose'
+                _values 'options' '-o' '--output' '-d' '--output-dir' '-r' '--recursive' '-c' '--crf' '-p' '--preset' '-w' '--width' '-b' '--bitrate' '-f' '--force' '-v' '--verbose'
+                return 0
+            fi
+            ;;
+        img-rename)
+            if [[ "$previous_word" == "-s" || "$previous_word" == "--sep" ]]; then
+                _values 'separator' '_' '-'
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-s' '--sep' '-n' '--dry-run' '-r' '--recursive' '--name' '--start'
+                return 0
+            fi
+            ;;
+        img-resize-width|img-resize-percentage|img-optimize|img-resize|img-batch-resize)
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-d' '--output-dir' '-f' '--force' '-n' '--dry-run' '-r' '--recursive'
+                return 0
+            fi
+            ;;
+        img-convert|img-optimize-to-webp)
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-d' '--output-dir' '-r' '--recursive' '-f' '--force' '-n' '--dry-run'
+                return 0
+            fi
+            ;;
+        img-thumbnail|img-resize-exact|img-resize-fill|img-adaptive-resize|img-resize-shrink-only|img-resize-colorspace)
+            if [[ "$previous_word" == "-m" || "$previous_word" == "--colorspace" ]]; then
+                _values 'colorspace' 'rgb' 'lab' 'luv'
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-d' '--output-dir' '-r' '--recursive' '-f' '--force' '-n' '--dry-run' '-m' '--colorspace'
+                return 0
+            fi
+            ;;
+        pdf-split)
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-p' '--pages' '-o' '--output' '-d' '--output-dir' '-r' '--recursive' '-f' '--force'
+                return 0
+            fi
+            ;;
+        pdf-merge)
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-o' '--output' '-r' '--recursive' '-f' '--force'
+                return 0
+            fi
+            ;;
+        pdf-compress)
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-o' '--output' '-d' '--output-dir' '-r' '--recursive' '-f' '--force'
+                return 0
+            fi
+            ;;
+        pdf-rotate)
+            if [[ "$previous_word" == "-a" || "$previous_word" == "--degrees" ]]; then
+                _values 'degrees' '90' '180' '270'
+                return 0
+            fi
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-a' '--degrees' '-p' '--pages' '-o' '--output' '-d' '--output-dir' '-r' '--recursive' '-f' '--force'
+                return 0
+            fi
+            ;;
+        pdf-burst)
+            if [[ "$previous_word" == "-o" || "$previous_word" == "--output" ]]; then
+                _files
+                return 0
+            fi
+            if [[ "$current_word" == -* ]]; then
+                _values 'options' '-p' '--pages-per-file' '-o' '--output' '-d' '--output-dir' '-r' '--recursive' '-f' '--force'
                 return 0
             fi
             ;;

@@ -284,22 +284,34 @@ remove-audio() {
     local force=false
     local reencode=false
     local verbose=false
-    local input=""
     local output=""
+    local output_dir=""
+    local recursive=false
+    local -a targets=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit remove-audio <input_video_file> [options]
-Description: Remove audio without re-encoding the video by default
-Options:
-  -o, --output FILE  Output file (default: input_noaudio.<same extension>)
-  -r, --reencode     Re-encode video as H.264 instead of copying it
-  -f, --force        Safely replace the output after conversion succeeds
-  -v, --verbose      Show FFmpeg progress and diagnostics
-Example: kit remove-audio video.mp4
-Output: Creates video_noaudio.mp4
+Usage: kit remove-audio <path>... [options]
+Description: Remove audio from one or more videos without re-encoding by default
+Default output:
+  One file                 Creates a sibling such as video-remove-audio.mp4
+  A folder                 Creates <folder>/removed-audio/ for its results
+  Several files            Creates a sibling result beside each input file
+Optional controls:
+  -o, --output FILE      Output file, valid with one input only
+  -d, --output-dir DIR   Use a custom result folder
+  -r, --recursive        Also include matching files in subfolders
+  --reencode             Re-encode video as H.264 instead of copying it
+  -f, --force            Safely replace outputs after conversion succeeds
+  -v, --verbose          Show FFmpeg progress and diagnostics
+Examples:
+  kit remove-audio video.mp4
+  kit remove-audio intro.mp4 outro.mov
+  kit remove-audio videos
+  kit remove-audio videos --recursive
+  kit remove-audio source.mkv --output silent.mkv
 EOF
                 return 0
                 ;;
@@ -311,7 +323,19 @@ EOF
                 output="$2"
                 shift 2
                 ;;
-            -r|--reencode)
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
+                ;;
+            --reencode)
                 reencode=true
                 shift
                 ;;
@@ -328,76 +352,107 @@ EOF
                 return 2
                 ;;
             *)
-                if [[ -z "$input" ]]; then
-                    input="$1"
-                else
-                    echo "Error: Unexpected argument '$1'" >&2
-                    return 2
-                fi
+                targets+=("$1")
                 shift
                 ;;
         esac
     done
 
-    if [[ -z "$input" ]]; then
-        echo "Error: Missing input video file" >&2
+    if [[ -n "$output" && -n "$output_dir" ]]; then
+        echo "Error: Use either --output or --output-dir, not both" >&2
         return 2
     fi
 
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
+    _kit_collect_files _kit_is_video_file "$recursive" video "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "removed-audio"
+    if [[ ${#reply[@]} -eq 0 ]]; then
+        echo "Error: No source video files found outside the removed-audio result folder" >&2
         return 1
+    fi
+    local -a inputs=("${reply[@]}")
+    local -a input_origins=("${reply_origins[@]}")
+    local -a input_relatives=("${reply_relatives[@]}")
+    if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
+        echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
+        return 2
     fi
 
     _kit_require ffmpeg || return 1
+    _kit_prepare_output_dir "$output_dir" || return 1
 
-    if [[ -z "$output" ]]; then
-        local input_stem
-        input_stem=$(_kit_media_stem "$input")
-        if [[ "$reencode" == true ]]; then
-            output="${input_stem}_noaudio.mp4"
+    local input input_extension output_extension current_output
+    local -a outputs=()
+    local -A seen_outputs=()
+    local index
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
+        input_extension="${input:e}"
+        [[ -z "$input_extension" ]] && input_extension="mkv"
+        output_extension="$input_extension"
+        [[ "$reencode" == true ]] && output_extension="mp4"
+        if [[ -n "$output" ]]; then
+            current_output="$output"
+        elif [[ -n "$output_dir" ]]; then
+            current_output="$output_dir/${input:t:r}-remove-audio.${output_extension}"
         else
-            local input_name="${input##*/}"
-            local input_extension="mkv"
-            if [[ "$input_name" == *.* ]]; then
-                input_extension="${input##*.}"
-            fi
-            output="${input_stem}_noaudio.${input_extension}"
+            _kit_default_output_path "$input" "${input_origins[$index]}" "${input_relatives[$index]}" \
+                "removed-audio" "-remove-audio" "$output_extension"
+            current_output="$REPLY"
         fi
-    fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
+        if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
+            echo "Error: Multiple inputs would create '$current_output'" >&2
+            return 1
+        fi
+        seen_outputs[${current_output:A}]=1
+        _kit_media_validate_output "$input" "$current_output" "$force" || return $?
+        outputs+=("$current_output")
+    done
 
-    local -a ffmpeg_args=(-map 0 -map -0:a -map_metadata 0 -map_chapters 0 -c copy)
-    if [[ "$reencode" == true ]]; then
-        ffmpeg_args+=(-c:v libx264 -crf 23 -preset fast)
-    fi
-    case "${output##*.}" in
-        mp4|MP4|m4v|M4V|mov|MOV)
-            ffmpeg_args+=(-movflags +faststart)
-            ;;
-    esac
-
-    _kit_media_run_ffmpeg "$input" "$output" "$force" "$verbose" "${ffmpeg_args[@]}" || return $?
-
-    _kit_media_report "Created" "$input" "$output"
+    local success=0
+    local failed=0
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
+        current_output="${outputs[$index]}"
+        local -a ffmpeg_args=(-map 0 -map -0:a -map_metadata 0 -map_chapters 0 -c copy)
+        [[ "$reencode" == true ]] && ffmpeg_args+=(-c:v libx264 -crf 23 -preset fast)
+        case "${current_output:e}" in
+            mp4|MP4|m4v|M4V|mov|MOV) ffmpeg_args+=(-movflags +faststart) ;;
+        esac
+        if _kit_media_run_ffmpeg "$input" "$current_output" "$force" "$verbose" "${ffmpeg_args[@]}"; then
+            _kit_media_report "Created" "$input" "$current_output"
+            ((success++))
+        else
+            ((failed++))
+        fi
+    done
+    echo "Processed $success file(s); $failed failed"
+    [[ $failed -eq 0 ]]
 }
 
 convert-to-mp3() {
     local force=false
     local verbose=false
-    local input=""
     local output=""
+    local output_dir=""
+    local recursive=false
     local preset="standard"
     local bitrate=""
     local preset_set=false
     local bitrate_set=false
+    local -a targets=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
                 cat << EOF
-Usage: kit convert-to-mp3 <input_media_file> [options]
-Description: Extract audio and convert it to a size-conscious MP3
-Options:
+Usage: kit convert-to-mp3 <path>... [options]
+Description: Extract audio from one or more media files and convert it to MP3
+Default output:
+  One file                 Creates a sibling such as recording.mp3
+  A folder                 Creates <folder>/converted-to-mp3/ for its results
+  Several files            Creates a sibling result beside each input file
+Optional controls:
   -p, --preset NAME  Quality profile (default: standard)
                      speech: 48kbps mono at 24kHz
                      compact: smaller VBR (quality 7)
@@ -405,14 +460,18 @@ Options:
                      high: high-quality VBR (quality 2)
                      maximum: constant 320kbps
   -b, --bitrate NUM  Custom bitrate in kbps (8-320)
-  -o, --output FILE  Output file (default: input.mp3)
-  -f, --force        Safely replace the output after conversion succeeds
-  -v, --verbose      Show FFmpeg progress and diagnostics
+  -o, --output FILE      Output file, valid with one input only
+  -d, --output-dir DIR   Use a custom result folder
+  -r, --recursive        Also include matching files in subfolders
+  -f, --force            Safely replace outputs after conversion succeeds
+  -v, --verbose          Show FFmpeg progress and diagnostics
 Examples:
   kit convert-to-mp3 video.mkv
+  kit convert-to-mp3 intro.mov outro.m4a
+  kit convert-to-mp3 recordings
+  kit convert-to-mp3 recordings --recursive --preset speech
   kit convert-to-mp3 recording.m4a --preset speech
   kit convert-to-mp3 music.m4a --bitrate 128 -o music.mp3
-Output: Creates video.mp3
 EOF
                 return 0
                 ;;
@@ -442,6 +501,18 @@ EOF
                 output="$2"
                 shift 2
                 ;;
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
+                ;;
             -f|--force)
                 force=true
                 shift
@@ -455,25 +526,29 @@ EOF
                 return 2
                 ;;
             *)
-                if [[ -z "$input" ]]; then
-                    input="$1"
-                else
-                    echo "Error: Unexpected argument '$1'" >&2
-                    return 2
-                fi
+                targets+=("$1")
                 shift
                 ;;
         esac
     done
 
-    if [[ -z "$input" ]]; then
-        echo "Error: Missing input media file" >&2
+    if [[ -n "$output" && -n "$output_dir" ]]; then
+        echo "Error: Use either --output or --output-dir, not both" >&2
         return 2
     fi
 
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
+    _kit_collect_files _kit_is_media_file "$recursive" media "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "converted-to-mp3"
+    if [[ ${#reply[@]} -eq 0 ]]; then
+        echo "Error: No source media files found outside the converted-to-mp3 result folder" >&2
         return 1
+    fi
+    local -a inputs=("${reply[@]}")
+    local -a input_origins=("${reply_origins[@]}")
+    local -a input_relatives=("${reply_relatives[@]}")
+    if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
+        echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
+        return 2
     fi
 
     _kit_require ffmpeg || return 1
@@ -498,12 +573,7 @@ EOF
         esac
     fi
 
-    if [[ -z "$output" ]]; then
-        output="$(_kit_media_stem "$input").mp3"
-    fi
-    local output_extension
-    output_extension=$(printf '%s' "${output##*.}" | tr '[:upper:]' '[:lower:]')
-    if [[ "$output_extension" != "mp3" ]]; then
+    if [[ -n "$output" && "${output:e:l}" != "mp3" ]]; then
         echo "Error: MP3 output file must use the .mp3 extension" >&2
         return 2
     fi
@@ -532,18 +602,60 @@ EOF
     fi
     ffmpeg_args+=(-id3v2_version 3)
 
-    _kit_media_run_ffmpeg "$input" "$output" "$force" "$verbose" "${ffmpeg_args[@]}" || return $?
+    _kit_prepare_output_dir "$output_dir" || return 1
+    local input current_output index
+    local -a outputs=()
+    local -A seen_outputs=()
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
+        if [[ -n "$output" ]]; then
+            current_output="$output"
+        elif [[ -n "$output_dir" ]]; then
+            current_output="$output_dir/${input:t:r}.mp3"
+        else
+            _kit_default_output_path "$input" "${input_origins[$index]}" "${input_relatives[$index]}" \
+                "converted-to-mp3" "" "mp3"
+            current_output="$REPLY"
+        fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
+        if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
+            echo "Error: Multiple inputs would create '$current_output'" >&2
+            return 1
+        fi
+        seen_outputs[${current_output:A}]=1
+        _kit_media_validate_output "$input" "$current_output" "$force" || return $?
+        outputs+=("$current_output")
+    done
 
-    _kit_media_report "Created" "$input" "$output"
+    local success=0
+    local failed=0
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
+        current_output="${outputs[$index]}"
+        if _kit_media_run_ffmpeg "$input" "$current_output" "$force" "$verbose" "${ffmpeg_args[@]}"; then
+            _kit_media_report "Created" "$input" "$current_output"
+            ((success++))
+        else
+            ((failed++))
+        fi
+    done
+    echo "Processed $success file(s); $failed failed"
+    [[ $failed -eq 0 ]]
 }
 
 compress-video() {
-    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
+    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
         cat << EOF
-Usage: kit compress-video <input_video> [options]
-Description: Compress video files to reduce size for uploads
-Options:
-  -o, --output FILE    Output file (default: input_compressed.mp4)
+Usage: kit compress-video <path>... [options]
+Description: Compress one or more video files
+Default output:
+  One file               Creates a sibling such as video-compressed.mp4
+  A folder               Creates <folder>/compressed-video/ for its results
+  Several files          Creates a sibling result beside each input file
+Optional controls:
+  -o, --output FILE    Output file, valid with one input only
+  -d, --output-dir DIR Use a custom result folder
+  -r, --recursive      Also include matching files in subfolders
   -c, --crf NUM        Quality level 18-28 (default: 23, lower=better)
   -p, --preset PRESET  Encoding speed (default: slow)
                        Options: ultrafast, superfast, veryfast, faster,
@@ -554,20 +666,25 @@ Options:
   -v, --verbose        Show ffmpeg output
 Examples:
   kit compress-video video.mp4
+  kit compress-video intro.mp4 outro.mov
+  kit compress-video videos
+  kit compress-video videos --recursive
   kit compress-video video.mp4 -c 28 -o small.mp4
   kit compress-video video.mp4 --width 1920 --preset medium
 EOF
         return 0
     fi
 
-    local input=""
     local output=""
+    local output_dir=""
+    local recursive=false
     local crf=23
     local preset="slow"
     local width=1280
     local bitrate="128k"
     local force=false
     local verbose=false
+    local -a targets=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -578,6 +695,18 @@ EOF
                 fi
                 output="$2"
                 shift 2
+                ;;
+            -d|--output-dir)
+                if [[ $# -lt 2 || -z "$2" ]]; then
+                    echo "Error: $1 requires a directory" >&2
+                    return 2
+                fi
+                output_dir="$2"
+                shift 2
+                ;;
+            -r|--recursive)
+                recursive=true
+                shift
                 ;;
             -c|--crf)
                 if [[ $# -lt 2 || -z "$2" ]]; then
@@ -624,32 +753,32 @@ EOF
                 return 2
                 ;;
             *)
-                if [[ -z "$input" ]]; then
-                    input="$1"
-                else
-                    echo "Error: Unexpected argument '$1'" >&2
-                    return 2
-                fi
+                targets+=("$1")
                 shift
                 ;;
         esac
     done
 
-    if [[ -z "$input" ]]; then
-        echo "Error: Missing input video file" >&2
+    if [[ -n "$output" && -n "$output_dir" ]]; then
+        echo "Error: Use either --output or --output-dir, not both" >&2
         return 2
     fi
 
-    if [[ ! -f "$input" ]]; then
-        echo "Error: Input file '$input' does not exist" >&2
+    _kit_collect_files _kit_is_video_file "$recursive" video "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "compressed-video"
+    if [[ ${#reply[@]} -eq 0 ]]; then
+        echo "Error: No source video files found outside the compressed-video result folder" >&2
         return 1
+    fi
+    local -a inputs=("${reply[@]}")
+    local -a input_origins=("${reply_origins[@]}")
+    local -a input_relatives=("${reply_relatives[@]}")
+    if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
+        echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
+        return 2
     fi
 
     _kit_require ffmpeg || return 1
-
-    if [[ -z "$output" ]]; then
-        output="$(_kit_media_stem "$input")_compressed.mp4"
-    fi
 
     # Validate CRF value (must be numeric, 0-51)
     if ! [[ "$crf" =~ ^[0-9]+$ ]] || [[ "$crf" -lt 0 ]] || [[ "$crf" -gt 51 ]]; then
@@ -691,13 +820,47 @@ EOF
         ffmpeg_args+=(-vf "scale='trunc(min(iw,${width})/2)*2':-2")
     fi
 
-    case "${output##*.}" in
-        mp4|MP4|m4v|M4V|mov|MOV)
-            ffmpeg_args+=(-movflags +faststart)
-            ;;
-    esac
+    _kit_prepare_output_dir "$output_dir" || return 1
+    local input current_output index
+    local -a outputs=()
+    local -A seen_outputs=()
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
+        if [[ -n "$output" ]]; then
+            current_output="$output"
+        elif [[ -n "$output_dir" ]]; then
+            current_output="$output_dir/${input:t:r}_compressed.mp4"
+        else
+            _kit_default_output_path "$input" "${input_origins[$index]}" "${input_relatives[$index]}" \
+                "compressed-video" "-compressed" "mp4"
+            current_output="$REPLY"
+        fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
+        if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
+            echo "Error: Multiple inputs would create '$current_output'" >&2
+            return 1
+        fi
+        seen_outputs[${current_output:A}]=1
+        _kit_media_validate_output "$input" "$current_output" "$force" || return $?
+        outputs+=("$current_output")
+    done
 
-    _kit_media_run_ffmpeg "$input" "$output" "$force" "$verbose" "${ffmpeg_args[@]}" || return $?
-
-    _kit_media_report "Compressed" "$input" "$output"
+    local success=0
+    local failed=0
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
+        current_output="${outputs[$index]}"
+        local -a current_args=("${ffmpeg_args[@]}")
+        case "${current_output:e}" in
+            mp4|MP4|m4v|M4V|mov|MOV) current_args+=(-movflags +faststart) ;;
+        esac
+        if _kit_media_run_ffmpeg "$input" "$current_output" "$force" "$verbose" "${current_args[@]}"; then
+            _kit_media_report "Compressed" "$input" "$current_output"
+            ((success++))
+        else
+            ((failed++))
+        fi
+    done
+    echo "Processed $success file(s); $failed failed"
+    [[ $failed -eq 0 ]]
 }

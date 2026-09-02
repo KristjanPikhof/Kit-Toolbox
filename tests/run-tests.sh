@@ -404,8 +404,8 @@ if [[ -f "$ASSETS_DIR/video/test_input_video.mp4" ]]; then
     run_test "compress-video: functional test" \
         "kit compress-video test_input_video.mp4 -o $compressed_output && [[ -f '$compressed_output' ]]"
 
-    # Test remove-audio (creates output file with _noaudio suffix)
-    no_audio_output="test_input_video_noaudio.mp4"
+    # Test remove-audio with its default sibling output
+    no_audio_output="test_input_video-remove-audio.mp4"
     rm -f "$no_audio_output" 2>/dev/null
     run_test "remove-audio: functional test" \
         "kit remove-audio test_input_video.mp4 && [[ -f '$no_audio_output' ]]"
@@ -471,11 +471,11 @@ if command -v yt-dlp &>/dev/null; then
         run_test "convert-to-mp3: youtube video to mp3" \
             "kit convert-to-mp3 '$youtube_video_file' && [[ -f '$youtube_mp3' ]]"
 
-        # Test remove-audio on downloaded video (output: <base>_noaudio.mp4)
-        youtube_noaudio="${youtube_base}_noaudio.mp4"
-        rm -f "$youtube_noaudio" 2>/dev/null
+        # Test remove-audio on downloaded video (output: <base>-remove-audio.mp4)
+        youtube_silent="${youtube_base}-remove-audio.mp4"
+        rm -f "$youtube_silent" 2>/dev/null
         run_test "remove-audio: youtube video remove audio" \
-            "kit remove-audio '$youtube_video_file' && [[ -f '$youtube_noaudio' ]]"
+            "kit remove-audio '$youtube_video_file' && [[ -f '$youtube_silent' ]]"
     fi
 
     cd - >/dev/null
@@ -644,7 +644,7 @@ list_output_files "$ASSETS_DIR/images/*-thumb.jpg"
 echo ""
 echo "Video outputs:"
 list_output_files "$ASSETS_DIR/video/*_compressed.mp4"
-list_output_files "$ASSETS_DIR/video/*_noaudio.mp4"
+list_output_files "$ASSETS_DIR/video/*-remove-audio.mp4"
 
 echo ""
 echo "PDF outputs:"
