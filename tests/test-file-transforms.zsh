@@ -68,6 +68,10 @@ img-thumbnail 80x80 "$TMP/images/nested" --recursive --output-dir "$TMP/thumbs" 
 assert_status "img-thumbnail accepts a directory" "$rc" 0
 assert_file "img-thumbnail creates directory output" "$TMP/thumbs/c-resized.webp"
 
+img-thumbnail 80x80 "$TMP/images/nested" >/dev/null; rc=$?
+assert_status "img-thumbnail uses a default folder" "$rc" 0
+assert_file "img-thumbnail creates its named result folder" "$TMP/images/nested/thumbnails/c-resized.webp"
+
 img-convert jpg webp "$TMP/images/a.jpg" --output-dir "$TMP/converted" >/dev/null; rc=$?
 assert_status "img-convert accepts a file" "$rc" 0
 assert_file "img-convert creates converted output" "$TMP/converted/a.webp"
@@ -108,6 +112,10 @@ pdf-burst "$TMP/pdfs/a.pdf" "$TMP/pdfs/b.PDF" --pages-per-file 2 --output-dir "$
 assert_status "pdf-burst accepts multiple files" "$rc" 0
 assert_file "pdf-burst keeps first input outputs separate" "$TMP/burst/a_burst/page_1.pdf"
 assert_file "pdf-burst keeps second input outputs separate" "$TMP/burst/b_burst/page_1.pdf"
+
+pdf-burst "$TMP/pdf-default" >/dev/null; rc=$?
+assert_status "pdf-burst uses a default folder" "$rc" 0
+assert_file "pdf-burst creates its named result folder" "$TMP/pdf-default/burst-pdf/one_burst/page_1.pdf"
 
 print -r -- ""
 print -r -- "Passed: $PASS"
