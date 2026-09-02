@@ -295,18 +295,23 @@ remove-audio() {
                 cat << EOF
 Usage: kit remove-audio <path>... [options]
 Description: Remove audio from one or more videos without re-encoding by default
-Options:
+Default output:
+  One file                 Creates a sibling such as video-remove-audio.mp4
+  A folder                 Creates <folder>/removed-audio/ for its results
+  Several files            Creates a sibling result beside each input file
+Optional controls:
   -o, --output FILE      Output file, valid with one input only
-  -d, --output-dir DIR   Put every output in DIR
-  -r, --recursive        Process directories recursively
+  -d, --output-dir DIR   Use a custom result folder
+  -r, --recursive        Also include matching files in subfolders
   --reencode             Re-encode video as H.264 instead of copying it
   -f, --force            Safely replace outputs after conversion succeeds
   -v, --verbose          Show FFmpeg progress and diagnostics
 Examples:
   kit remove-audio video.mp4
   kit remove-audio intro.mp4 outro.mov
-  kit remove-audio ./videos --recursive --output-dir ./silent
-Output: Creates files with a _noaudio suffix
+  kit remove-audio videos
+  kit remove-audio videos --recursive
+  kit remove-audio source.mkv --output silent.mkv
 EOF
                 return 0
                 ;;
@@ -359,7 +364,14 @@ EOF
     fi
 
     _kit_collect_files _kit_is_video_file "$recursive" video "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "removed-audio"
+    if [[ ${#reply[@]} -eq 0 ]]; then
+        echo "Error: No source video files found outside the removed-audio result folder" >&2
+        return 1
+    fi
     local -a inputs=("${reply[@]}")
+    local -a input_origins=("${reply_origins[@]}")
+    local -a input_relatives=("${reply_relatives[@]}")
     if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
         echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
         return 2
@@ -368,11 +380,12 @@ EOF
     _kit_require ffmpeg || return 1
     _kit_prepare_output_dir "$output_dir" || return 1
 
-    local input input_stem input_extension output_extension current_output
+    local input input_extension output_extension current_output
     local -a outputs=()
     local -A seen_outputs=()
-    for input in "${inputs[@]}"; do
-        input_stem=$(_kit_media_stem "$input")
+    local index
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
         input_extension="${input:e}"
         [[ -z "$input_extension" ]] && input_extension="mkv"
         output_extension="$input_extension"
@@ -380,12 +393,13 @@ EOF
         if [[ -n "$output" ]]; then
             current_output="$output"
         elif [[ -n "$output_dir" ]]; then
-            current_output="$output_dir/${input:t:r}_noaudio.${output_extension}"
-        elif [[ "$reencode" == true ]]; then
-            current_output="${input_stem}_noaudio.mp4"
+            current_output="$output_dir/${input:t:r}-remove-audio.${output_extension}"
         else
-            current_output="${input_stem}_noaudio.${input_extension}"
+            _kit_default_output_path "$input" "${input_origins[$index]}" "${input_relatives[$index]}" \
+                "removed-audio" "-remove-audio" "$output_extension"
+            current_output="$REPLY"
         fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
         if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$current_output'" >&2
             return 1
@@ -397,7 +411,6 @@ EOF
 
     local success=0
     local failed=0
-    local index
     for ((index=1; index<=${#inputs[@]}; index++)); do
         input="${inputs[$index]}"
         current_output="${outputs[$index]}"
@@ -435,7 +448,11 @@ convert-to-mp3() {
                 cat << EOF
 Usage: kit convert-to-mp3 <path>... [options]
 Description: Extract audio from one or more media files and convert it to MP3
-Options:
+Default output:
+  One file                 Creates a sibling such as recording.mp3
+  A folder                 Creates <folder>/converted-to-mp3/ for its results
+  Several files            Creates a sibling result beside each input file
+Optional controls:
   -p, --preset NAME  Quality profile (default: standard)
                      speech: 48kbps mono at 24kHz
                      compact: smaller VBR (quality 7)
@@ -444,17 +461,17 @@ Options:
                      maximum: constant 320kbps
   -b, --bitrate NUM  Custom bitrate in kbps (8-320)
   -o, --output FILE      Output file, valid with one input only
-  -d, --output-dir DIR   Put every output in DIR
-  -r, --recursive        Process directories recursively
+  -d, --output-dir DIR   Use a custom result folder
+  -r, --recursive        Also include matching files in subfolders
   -f, --force            Safely replace outputs after conversion succeeds
   -v, --verbose          Show FFmpeg progress and diagnostics
 Examples:
   kit convert-to-mp3 video.mkv
   kit convert-to-mp3 intro.mov outro.m4a
-  kit convert-to-mp3 ./recordings --recursive --preset speech
+  kit convert-to-mp3 recordings
+  kit convert-to-mp3 recordings --recursive --preset speech
   kit convert-to-mp3 recording.m4a --preset speech
   kit convert-to-mp3 music.m4a --bitrate 128 -o music.mp3
-Output: Creates video.mp3
 EOF
                 return 0
                 ;;
@@ -521,7 +538,14 @@ EOF
     fi
 
     _kit_collect_files _kit_is_media_file "$recursive" media "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "converted-to-mp3"
+    if [[ ${#reply[@]} -eq 0 ]]; then
+        echo "Error: No source media files found outside the converted-to-mp3 result folder" >&2
+        return 1
+    fi
     local -a inputs=("${reply[@]}")
+    local -a input_origins=("${reply_origins[@]}")
+    local -a input_relatives=("${reply_relatives[@]}")
     if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
         echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
         return 2
@@ -579,17 +603,21 @@ EOF
     ffmpeg_args+=(-id3v2_version 3)
 
     _kit_prepare_output_dir "$output_dir" || return 1
-    local input current_output
+    local input current_output index
     local -a outputs=()
     local -A seen_outputs=()
-    for input in "${inputs[@]}"; do
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
         if [[ -n "$output" ]]; then
             current_output="$output"
         elif [[ -n "$output_dir" ]]; then
             current_output="$output_dir/${input:t:r}.mp3"
         else
-            current_output="$(_kit_media_stem "$input").mp3"
+            _kit_default_output_path "$input" "${input_origins[$index]}" "${input_relatives[$index]}" \
+                "converted-to-mp3" "" "mp3"
+            current_output="$REPLY"
         fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
         if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$current_output'" >&2
             return 1
@@ -601,7 +629,6 @@ EOF
 
     local success=0
     local failed=0
-    local index
     for ((index=1; index<=${#inputs[@]}; index++)); do
         input="${inputs[$index]}"
         current_output="${outputs[$index]}"
@@ -621,10 +648,14 @@ compress-video() {
         cat << EOF
 Usage: kit compress-video <path>... [options]
 Description: Compress one or more video files
-Options:
+Default output:
+  One file               Creates a sibling such as video-compressed.mp4
+  A folder               Creates <folder>/compressed-video/ for its results
+  Several files          Creates a sibling result beside each input file
+Optional controls:
   -o, --output FILE    Output file, valid with one input only
-  -d, --output-dir DIR Put every output in DIR
-  -r, --recursive      Process directories recursively
+  -d, --output-dir DIR Use a custom result folder
+  -r, --recursive      Also include matching files in subfolders
   -c, --crf NUM        Quality level 18-28 (default: 23, lower=better)
   -p, --preset PRESET  Encoding speed (default: slow)
                        Options: ultrafast, superfast, veryfast, faster,
@@ -636,7 +667,8 @@ Options:
 Examples:
   kit compress-video video.mp4
   kit compress-video intro.mp4 outro.mov
-  kit compress-video ./videos --recursive --output-dir ./compressed
+  kit compress-video videos
+  kit compress-video videos --recursive
   kit compress-video video.mp4 -c 28 -o small.mp4
   kit compress-video video.mp4 --width 1920 --preset medium
 EOF
@@ -733,7 +765,14 @@ EOF
     fi
 
     _kit_collect_files _kit_is_video_file "$recursive" video "${targets[@]}" || return $?
+    _kit_exclude_collected_subdir "compressed-video"
+    if [[ ${#reply[@]} -eq 0 ]]; then
+        echo "Error: No source video files found outside the compressed-video result folder" >&2
+        return 1
+    fi
     local -a inputs=("${reply[@]}")
+    local -a input_origins=("${reply_origins[@]}")
+    local -a input_relatives=("${reply_relatives[@]}")
     if [[ -n "$output" && ${#inputs[@]} -ne 1 ]]; then
         echo "Error: --output requires exactly one input. Use --output-dir for batches." >&2
         return 2
@@ -782,17 +821,21 @@ EOF
     fi
 
     _kit_prepare_output_dir "$output_dir" || return 1
-    local input current_output
+    local input current_output index
     local -a outputs=()
     local -A seen_outputs=()
-    for input in "${inputs[@]}"; do
+    for ((index=1; index<=${#inputs[@]}; index++)); do
+        input="${inputs[$index]}"
         if [[ -n "$output" ]]; then
             current_output="$output"
         elif [[ -n "$output_dir" ]]; then
             current_output="$output_dir/${input:t:r}_compressed.mp4"
         else
-            current_output="$(_kit_media_stem "$input")_compressed.mp4"
+            _kit_default_output_path "$input" "${input_origins[$index]}" "${input_relatives[$index]}" \
+                "compressed-video" "-compressed" "mp4"
+            current_output="$REPLY"
         fi
+        _kit_prepare_output_dir "${current_output:h}" || return 1
         if [[ -n "${seen_outputs[${current_output:A}]:-}" ]]; then
             echo "Error: Multiple inputs would create '$current_output'" >&2
             return 1
@@ -804,7 +847,6 @@ EOF
 
     local success=0
     local failed=0
-    local index
     for ((index=1; index<=${#inputs[@]}; index++)); do
         input="${inputs[$index]}"
         current_output="${outputs[$index]}"
