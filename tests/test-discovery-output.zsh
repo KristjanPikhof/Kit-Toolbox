@@ -59,6 +59,8 @@ assert_contains "kit -h includes configured shortcut description" "$out" "Fixtur
 assert_contains "kit -h includes configured editor name" "$out" "edit"
 assert_contains "kit -h includes configured editor description" "$out" "Fixture fake editor"
 assert_contains "kit -h shows complete PDF signatures" "$out" "--degrees <degrees> <path>... [options]"
+assert_contains "kit -h explains folder input" "$out" "Process matching files in a folder"
+assert_contains "kit -h explains recursive plainly" "$out" "--recursive also includes nested folders"
 
 out=$(run_zsh '
   source "$KIT_EXT_DIR/loader.zsh" >/dev/null
