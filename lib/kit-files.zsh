@@ -202,3 +202,28 @@ _kit_default_output_for_collected() {
     echo "Error: Cannot determine the source of '$input'" >&2
     return 1
 }
+
+_kit_default_result_dir_for_collected() {
+    local input="$1"
+    local result_folder="$2"
+    local suffix="$3"
+    local index origin relative relative_dir
+
+    for ((index=1; index<=${#reply[@]}; index++)); do
+        [[ "${reply[$index]:A}" == "${input:A}" ]] || continue
+        origin="${reply_origins[$index]}"
+        relative="${reply_relatives[$index]}"
+        if [[ -z "$origin" ]]; then
+            REPLY="${input:r}${suffix}"
+        else
+            relative_dir="${relative:h}"
+            REPLY="$origin/$result_folder"
+            [[ "$relative_dir" != "." ]] && REPLY="$REPLY/$relative_dir"
+            REPLY="$REPLY/${relative:t:r}${suffix}"
+        fi
+        return 0
+    done
+
+    echo "Error: Cannot determine the source of '$input'" >&2
+    return 1
+}
