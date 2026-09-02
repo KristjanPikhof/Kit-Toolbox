@@ -520,6 +520,15 @@ kit() {
             echo ""
         fi
 
+        echo "${CYAN}📂 File Command Basics${NC}"
+        echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
+        echo "  ${YELLOW}kit ${GREEN}<command>${NC} file            Process one file"
+        echo "  ${YELLOW}kit ${GREEN}<command>${NC} file1 file2     Process several files"
+        echo "  ${YELLOW}kit ${GREEN}<command>${NC} folder          Process matching files in a folder"
+        echo "  ${DIM}Folder results get a named subfolder. --recursive also includes nested folders.${NC}"
+        echo "  ${DIM}Run kit <command> -h to see exact outputs, options, and examples.${NC}"
+        echo ""
+
         echo "${CYAN}💡 Getting Started${NC}"
         echo "${GRAY}$( printf '%.0s─' {1..65} )${NC}"
         echo "  ${YELLOW}kit ${GREEN}<command>${NC} [args]     Run a function"
