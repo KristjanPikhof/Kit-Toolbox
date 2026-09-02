@@ -60,6 +60,10 @@ assert_status "img-resize accepts multiple files" "$rc" 0
 assert_file "img-resize creates first output" "$TMP/images/a-resized.jpg"
 assert_file "img-resize creates second output" "$TMP/images/b-resized.png"
 
+img-resize 100x100 "$TMP/images" >/dev/null; rc=$?
+assert_status "img-resize accepts a folder without output options" "$rc" 0
+assert_file "img-resize creates its default result folder" "$TMP/images/resized/a-resized.jpg"
+
 img-thumbnail 80x80 "$TMP/images/nested" --recursive --output-dir "$TMP/thumbs" >/dev/null; rc=$?
 assert_status "img-thumbnail accepts a directory" "$rc" 0
 assert_file "img-thumbnail creates directory output" "$TMP/thumbs/c-resized.webp"
@@ -68,10 +72,24 @@ img-convert jpg webp "$TMP/images/a.jpg" --output-dir "$TMP/converted" >/dev/nul
 assert_status "img-convert accepts a file" "$rc" 0
 assert_file "img-convert creates converted output" "$TMP/converted/a.webp"
 
+mkdir -p "$TMP/image-convert/nested"
+touch "$TMP/image-convert/one.jpg" "$TMP/image-convert/nested/two.jpg"
+img-convert jpg webp "$TMP/image-convert" --recursive >/dev/null; rc=$?
+assert_status "img-convert uses a default folder" "$rc" 0
+assert_file "img-convert creates a folder result" "$TMP/image-convert/converted/one.webp"
+assert_file "img-convert preserves nested paths" "$TMP/image-convert/converted/nested/two.webp"
+
 pdf-compress "$TMP/pdfs/a.pdf" "$TMP/pdfs/b.PDF" --output-dir "$TMP/compressed" >/dev/null; rc=$?
 assert_status "pdf-compress accepts multiple files" "$rc" 0
 assert_file "pdf-compress creates first output" "$TMP/compressed/a_compressed.pdf"
 assert_file "pdf-compress creates second output" "$TMP/compressed/b_compressed.pdf"
+
+mkdir -p "$TMP/pdf-default/nested"
+touch "$TMP/pdf-default/one.pdf" "$TMP/pdf-default/nested/two.pdf"
+pdf-compress "$TMP/pdf-default" --recursive >/dev/null; rc=$?
+assert_status "pdf-compress uses a default folder" "$rc" 0
+assert_file "pdf-compress creates a folder result" "$TMP/pdf-default/compressed-pdf/one_compressed.pdf"
+assert_file "pdf-compress preserves nested paths" "$TMP/pdf-default/compressed-pdf/nested/two_compressed.pdf"
 
 pdf-split --pages 1 "$TMP/pdfs/a.pdf" "$TMP/pdfs/b.PDF" --output-dir "$TMP/split" >/dev/null; rc=$?
 assert_status "pdf-split accepts multiple files" "$rc" 0
