@@ -237,6 +237,15 @@ assert_status "remove-audio folder default succeeds" "$rc" 0
 assert_file_exists "remove-audio creates its default result folder" "$TMP/media-default/video/removed-audio/first-remove-audio.mp4"
 assert_file_exists "remove-audio preserves nested paths" "$TMP/media-default/video/removed-audio/nested/second-remove-audio.mp4"
 
+out=$(remove-audio "$TMP/media-default/video" --recursive --force 2>&1)
+rc=$?
+assert_status "remove-audio can rerun a folder safely" "$rc" 0
+if [[ ! -d "$TMP/media-default/video/removed-audio/removed-audio" ]]; then
+    pass "remove-audio does not process its own result folder"
+else
+    fail "remove-audio does not process its own result folder" "nested result folder was created"
+fi
+
 out=$(compress-video "$TMP/media-batch/video" --preset ultrafast --output-dir "$TMP/media-batch/compressed" 2>&1)
 rc=$?
 assert_status "compress-video accepts a directory" "$rc" 0
